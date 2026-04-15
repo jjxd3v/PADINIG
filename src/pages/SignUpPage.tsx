@@ -4,7 +4,6 @@ import {
   Megaphone,
   Lock,
   User,
-  Mail,
   Phone,
   MapPin,
   ArrowLeft,
@@ -15,6 +14,7 @@ import {
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { puroks } from '../data/mockData';
+import { apiFetch } from '../lib/api';
 export function SignUpPage() {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
@@ -46,11 +46,17 @@ export function SignUpPage() {
   const validate = () => {
     const newErrors: Record<string, string> = {};
     if (!formData.fullName.trim()) newErrors.fullName = 'Full name is required';
-    if (!formData.username.trim()) newErrors.username = 'Username is required';
+    const username = formData.username.trim();
+    if (!username) newErrors.username = 'Username is required';
     if (formData.username.toLowerCase() === 'admin')
     newErrors.username = 'This username is reserved';
-    if (formData.password.length < 6)
-    newErrors.password = 'Password must be at least 6 characters';
+    if (username && !/^[a-zA-Z0-9_]+$/.test(username)) {
+      newErrors.username = 'Username can only contain letters, numbers, and underscores';
+    } else if (username && username.length < 3) {
+      newErrors.username = 'Username must be at least 3 characters';
+    }
+    if (formData.password.length < 8)
+    newErrors.password = 'Password must be at least 8 characters';
     if (formData.password !== formData.confirmPassword)
     newErrors.confirmPassword = 'Passwords do not match';
     if (!formData.contactNumber.trim()) {
@@ -66,39 +72,31 @@ export function SignUpPage() {
       }
     }
     if (!formData.purok) newErrors.purok = 'Please select your Purok/Zone';
-    // Check if username already exists
-    const registeredUsers = JSON.parse(
-      localStorage.getItem('padinig_users') || '[]'
-    );
-    const exists = registeredUsers.some(
-      (u: {username: string;}) =>
-      u.username.toLowerCase() === formData.username.toLowerCase()
-    );
-    if (exists) newErrors.username = 'Username already taken';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
-  const handleSignUp = (e: React.FormEvent) => {
+  const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
     setIsLoading(true);
-    setTimeout(() => {
-      // Save user to localStorage
-      const registeredUsers = JSON.parse(
-        localStorage.getItem('padinig_users') || '[]'
-      );
-      registeredUsers.push({
-        fullName: formData.fullName,
-        username: formData.username,
-        password: formData.password,
-        contactNumber: formData.contactNumber,
-        purok: formData.purok,
-        registeredAt: new Date().toISOString()
+    try {
+      await apiFetch('/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: formData.username.trim(),
+          password: formData.password,
+          name: formData.fullName,
+          purok: formData.purok,
+          contactNumber: formData.contactNumber,
+        }),
       });
-      localStorage.setItem('padinig_users', JSON.stringify(registeredUsers));
       toast.success('Account created successfully! Please sign in.');
       navigate('/login');
-    }, 1000);
+    } catch (err: any) {
+      toast.error(err?.message || 'Sign up failed');
+      setIsLoading(false);
+    }
   };
   return (
     <div className="min-h-screen bg-surface-muted flex flex-col items-center justify-start sm:justify-center px-4 py-6 sm:py-8 relative overflow-x-hidden">

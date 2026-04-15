@@ -1,4 +1,4 @@
-import React, { useEffect, useState, Children } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Megaphone,
@@ -18,24 +18,20 @@ import {
 import { AdminLayout } from '../components/AdminLayout';
 import { StatCard } from '../components/StatCard';
 import { AnnouncementCard } from '../components/AnnouncementCard';
-import { getAnnouncements, checkAndUpdateScheduled } from '../data/mockData';
 import { motion } from 'framer-motion';
+import { apiFetch } from '../lib/api';
+import type { ApiAnnouncement, UiAnnouncement } from '../lib/announcements';
+import { toUiAnnouncement } from '../lib/announcements';
 export function DashboardPage() {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  checkAndUpdateScheduled();
-  const announcements = getAnnouncements();
-  const registeredUsers = JSON.parse(
-    localStorage.getItem('padinig_users') || '[]'
-  );
-  const smsResidents = JSON.parse(
-    localStorage.getItem('padinig_residents') || '[]'
-  );
-  const totalResidents = smsResidents.length + registeredUsers.length;
-  const sortedAnnouncements = [...announcements].sort(
-    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-  );
+  const [announcements, setAnnouncements] = useState<UiAnnouncement[]>([]);
+  const [totalResidents, setTotalResidents] = useState(0);
+  const [scheduledCount, setScheduledCount] = useState(0);
+  const [emergencyCount, setEmergencyCount] = useState(0);
+
+  const sortedAnnouncements = [...announcements].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   const filteredAnnouncements = searchQuery ?
   sortedAnnouncements.filter(
     (a) =>
@@ -47,16 +43,24 @@ export function DashboardPage() {
     )
   ) :
   sortedAnnouncements.slice(0, 4);
-  const scheduledCount = announcements.filter(
-    (a) => a.status === 'Pending'
-  ).length;
-  const emergencyCount = announcements.filter((a) => a.isEmergency).length;
   useEffect(() => {
-    // Simulate API call
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 800);
-    return () => clearTimeout(timer);
+    const load = async () => {
+      try {
+        setIsLoading(true);
+        const [ann, users] = await Promise.all([
+          apiFetch<{ items: ApiAnnouncement[] }>('/announcements?page=1&pageSize=50'),
+          apiFetch<{ total: number }>('/users?page=1&pageSize=1&role=RESIDENT'),
+        ]);
+        const ui = ann.items.map(toUiAnnouncement);
+        setAnnouncements(ui);
+        setTotalResidents(users.total);
+        setScheduledCount(ui.filter((a) => a.status === 'Pending').length);
+        setEmergencyCount(ui.filter((a) => a.isEmergency).length);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    load();
   }, []);
   const containerVariants = {
     hidden: {

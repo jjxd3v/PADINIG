@@ -1,8 +1,7 @@
 import React from 'react';
-import { Category, Status } from '../data/mockData';
 interface BadgeProps {
   type: 'category' | 'status' | 'tag';
-  value: Category | Status | string;
+  value: string;
   className?: string;
 }
 export function Badge({ type, value, className = '' }: BadgeProps) {

@@ -1,20 +1,15 @@
-import React, { useEffect, useState, useRef, Component } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Megaphone,
   Search,
-  MapPin,
-  Moon,
-  Sun,
   BellRing,
   Bell,
   X,
   Calendar,
-  Users,
   Smartphone,
   Globe,
   MessageSquare,
-  Send,
   Radio,
   Menu,
   LayoutGrid,
@@ -29,15 +24,12 @@ import {
   LogOut,
   Edit,
   User,
-  CheckCircle2,
   Info,
   Settings } from
 'lucide-react';
-import {
-  getAnnouncements,
-  Announcement,
-  checkAndUpdateScheduled } from
-'../data/mockData';
+import type { ApiAnnouncement } from '../lib/announcements';
+import { toUiAnnouncement, type UiAnnouncement } from '../lib/announcements';
+import { apiFetch } from '../lib/api';
 import { AnnouncementCard } from '../components/AnnouncementCard';
 import { BantAIChat } from '../components/BantAIChat';
 import { Badge } from '../components/Badge';
@@ -45,6 +37,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from '../contexts/ThemeContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { toast } from 'sonner';
+import { getAuthUser, clearAuthSession } from '../lib/auth';
 // Helper to get icon and color for a notification based on type/category
 function getNotificationStyle(type: string, category: string) {
   if (type === 'emergency') {
@@ -98,7 +91,7 @@ function getNotificationStyle(type: string, category: string) {
 }
 export function PublicAnnouncementsPage() {
   const navigate = useNavigate();
-  const { isDark, toggleTheme } = useTheme();
+  useTheme();
   const {
     markAsRead,
     markAllAsRead,
@@ -109,8 +102,9 @@ export function PublicAnnouncementsPage() {
   const [activeCategory, setActiveCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [publicAnnouncements, setPublicAnnouncements] = useState<UiAnnouncement[]>([]);
   const [selectedAnnouncement, setSelectedAnnouncement] =
-  useState<Announcement | null>(null);
+  useState<UiAnnouncement | null>(null);
   // Sidebar state
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -139,43 +133,37 @@ export function PublicAnnouncementsPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
   useEffect(() => {
-    // Simulate API call
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 800);
-    return () => clearTimeout(timer);
-  }, []);
-  useEffect(() => {
-    // Get the currently logged-in user from localStorage
-    const currentUsername = localStorage.getItem('padinig_current_user');
-    const users = JSON.parse(localStorage.getItem('padinig_users') || '[]');
-    const loggedInUser = currentUsername ?
-    users.find((u: any) => u.username === currentUsername) :
-    users[0]; // fallback to first user if no session
-    if (loggedInUser) {
-      setCurrentUser(loggedInUser);
+    // Load current user (if logged in)
+    const user = getAuthUser();
+    setCurrentUser(user);
+    if (user) {
       setEditFormData({
-        fullName: loggedInUser.fullName || '',
-        contactNumber: loggedInUser.contactNumber || '',
-        password: '',
-        confirmPassword: ''
-      });
-    } else {
-      // Fallback mock user
-      const mockUser = {
-        fullName: 'Resident User',
-        contactNumber: '09123456789',
-        username: 'resident',
-        purok: ''
-      };
-      setCurrentUser(mockUser);
-      setEditFormData({
-        fullName: mockUser.fullName,
-        contactNumber: mockUser.contactNumber,
+        fullName: user.name || '',
+        contactNumber: user.contactNumber || '',
         password: '',
         confirmPassword: ''
       });
     }
+  }, []);
+
+  useEffect(() => {
+    const fetchAnnouncements = async () => {
+      try {
+        setIsLoading(true);
+        const data = await apiFetch<{ items: ApiAnnouncement[] }>(
+          '/announcements/public?page=1&pageSize=100'
+        );
+        setPublicAnnouncements(data.items.map(toUiAnnouncement));
+      } catch (error) {
+        console.error('Failed to fetch announcements:', error);
+        toast.error('Failed to load announcements');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchAnnouncements();
+    const interval = setInterval(fetchAnnouncements, 15000);
+    return () => clearInterval(interval);
   }, []);
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
@@ -186,39 +174,32 @@ export function PublicAnnouncementsPage() {
       toast.error('Passwords do not match');
       return;
     }
-    // Update user in localStorage
-    const users = JSON.parse(localStorage.getItem('padinig_users') || '[]');
-    const updatedUsers = users.map((u: any) => {
-      if (u.username === currentUser?.username) {
-        return {
-          ...u,
-          fullName: editFormData.fullName,
-          contactNumber: editFormData.contactNumber,
-          ...(editFormData.password ?
-          {
-            password: editFormData.password
-          } :
-          {})
-        };
+    (async () => {
+      try {
+        const updated = await apiFetch<any>('/auth/me', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: editFormData.fullName,
+            contactNumber: editFormData.contactNumber,
+            purok: currentUser?.purok || undefined,
+          }),
+        });
+        setCurrentUser(updated);
+        toast.success('Profile updated successfully');
+        setEditProfileModalOpen(false);
+        setEditFormData((prev) => ({
+          ...prev,
+          password: '',
+          confirmPassword: ''
+        }));
+      } catch (err: any) {
+        toast.error(err?.message || 'Failed to update profile');
       }
-      return u;
-    });
-    localStorage.setItem('padinig_users', JSON.stringify(updatedUsers));
-    setCurrentUser({
-      ...currentUser,
-      fullName: editFormData.fullName,
-      contactNumber: editFormData.contactNumber
-    });
-    toast.success('Profile updated successfully');
-    setEditProfileModalOpen(false);
-    setEditFormData((prev) => ({
-      ...prev,
-      password: '',
-      confirmPassword: ''
-    }));
+    })();
   };
   const handleLogout = () => {
-    localStorage.removeItem('padinig_current_user');
+    clearAuthSession();
     toast.success('Logged out successfully');
     navigate('/login');
   };
@@ -228,31 +209,19 @@ export function PublicAnnouncementsPage() {
   const notifications = getNotificationsForPurok(userPurok);
   const unreadCount = getUnreadCountForPurok(userPurok);
   // Filter announcements: only show those targeted to the user's purok or "All"
-  checkAndUpdateScheduled();
-  const now = new Date();
-  const publicAnnouncements = getAnnouncements().
-  filter((a) => {
-    // Show all "Sent" announcements
-    if (a.status === 'Sent') return true;
-    // For "Pending" (scheduled), only show if the scheduled time has passed
-    if (a.status === 'Pending') {
-      return new Date(a.date) <= now;
-    }
-    return false;
-  }).
-  filter((a) => {
-    // If no purok set (fallback user), show all announcements
-    if (!userPurok) return true;
-    // Show if targeted to all residents or the user's specific purok
-    return a.targetAudience.some(
-      (t) =>
-      t === 'All' ||
-      t === 'All Residents' ||
-      t.toLowerCase() === userPurok.toLowerCase()
-    );
-  }).
-  sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  const filtered = publicAnnouncements.filter((a) => {
+  const visibleAnnouncements = publicAnnouncements
+    .filter((a) => a.status === 'Sent')
+    .filter((a) => {
+      if (!userPurok) return true;
+      return a.targetAudience.some(
+        (t) =>
+          t === 'All' ||
+          t === 'All Residents' ||
+          t.toLowerCase() === userPurok.toLowerCase()
+      );
+    })
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const filtered = visibleAnnouncements.filter((a) => {
     const matchesCategory =
     activeCategory === 'All' || a.category === activeCategory;
     const matchesSearch =
@@ -393,25 +362,8 @@ export function PublicAnnouncementsPage() {
           })}
         </div>
 
-        {/* Sidebar Footer (Theme & Profile) */}
+        {/* Sidebar Footer (Profile) */}
         <div className="p-3 border-t border-white/10 dark:border-slate-800 bg-black/10 dark:bg-slate-900/50 space-y-2">
-          <button
-            onClick={toggleTheme}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-300 hover:bg-white/10 hover:text-white transition-all duration-200 ${sidebarCollapsed ? 'justify-center' : 'justify-start'}`}
-            title={sidebarCollapsed ? 'Toggle Theme' : undefined}>
-            
-            {isDark ?
-            <Sun size={20} className="shrink-0" /> :
-
-            <Moon size={20} className="shrink-0" />
-            }
-            {!sidebarCollapsed &&
-            <span className="tracking-wide font-medium whitespace-nowrap">
-                {isDark ? 'Light Mode' : 'Dark Mode'}
-              </span>
-            }
-          </button>
-
           <div
             className={`bg-white/5 rounded-xl p-3 ${sidebarCollapsed ? 'flex justify-center' : ''}`}>
             
@@ -439,7 +391,7 @@ export function PublicAnnouncementsPage() {
                   </div>
                   <div className="overflow-hidden">
                     <p className="text-sm font-bold text-white truncate">
-                      {currentUser?.fullName || 'Resident User'}
+                      {currentUser?.name || 'Resident User'}
                     </p>
                     <p className="text-xs text-slate-400 truncate">
                       {currentUser?.purok ? `${currentUser.purok} • ` : ''}
@@ -513,17 +465,8 @@ export function PublicAnnouncementsPage() {
               </div>
             </div>
 
-            {/* Right: Notifications + Theme Toggle */}
+            {/* Right: Notifications */}
             <div className="flex items-center gap-2 sm:gap-3">
-              {/* Theme Toggle */}
-              <button
-                onClick={toggleTheme}
-                className="p-2 rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-700/50 dark:hover:text-slate-200 transition-all duration-200 min-h-[44px] min-w-[44px] flex items-center justify-center"
-                aria-label="Toggle theme">
-                
-                {isDark ? <Sun size={20} /> : <Moon size={20} />}
-              </button>
-
               {/* Notifications */}
               <div className="relative" ref={notifRef}>
                 <button
@@ -630,23 +573,6 @@ export function PublicAnnouncementsPage() {
                 </AnimatePresence>
               </div>
 
-              {/* User Avatar (visible on desktop) */}
-              <button
-                onClick={() => setEditProfileModalOpen(true)}
-                className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-all"
-                title="Edit Profile">
-                
-                <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-primary/20 dark:border-primary/30">
-                  <img
-                    src={`https://api.dicebear.com/7.x/pixel-art/svg?seed=${encodeURIComponent(currentUser?.username || 'user')}`}
-                    alt="Avatar"
-                    className="w-full h-full" />
-                  
-                </div>
-                <span className="hidden sm:block text-sm font-semibold text-slate-700 dark:text-slate-200 max-w-[120px] truncate">
-                  {currentUser?.fullName || 'Resident'}
-                </span>
-              </button>
             </div>
           </div>
         </header>

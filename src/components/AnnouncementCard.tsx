@@ -5,16 +5,26 @@ import {
   Radio,
   ArrowRight,
   X,
-  Send,
-  Globe,
-  Smartphone,
-  MessageSquare } from
+  Send } from
 'lucide-react';
-import { Announcement, getRelativeTime } from '../data/mockData';
+import { getRelativeTime } from '../data/mockData';
 import { Badge } from './Badge';
 import { motion, AnimatePresence } from 'framer-motion';
+
+type AnnouncementLike = {
+  id: string;
+  title: string;
+  message: string;
+  category: string;
+  date: string;
+  status: string;
+  targetAudience: string[];
+  deliveryMethod: string;
+  recipientsCount?: number;
+  isEmergency?: boolean;
+};
 interface AnnouncementCardProps {
-  announcement: Announcement;
+  announcement: AnnouncementLike;
   compact?: boolean;
   hideStatus?: boolean;
 }
@@ -44,12 +54,6 @@ export function AnnouncementCard({
   } else if (announcement.category === 'Event') {
     tag = 'Event';
   }
-  const deliveryIcon =
-  announcement.deliveryMethod === 'SMS' ?
-  Smartphone :
-  announcement.deliveryMethod === 'Web' ?
-  Globe :
-  MessageSquare;
   const deliveryLabel =
   announcement.deliveryMethod === 'Both' ?
   'SMS & Web Platform' :

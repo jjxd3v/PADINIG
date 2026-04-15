@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Search,
   Plus,
@@ -14,15 +14,26 @@ import {
   Info } from
 'lucide-react';
 import { AdminLayout } from '../components/AdminLayout';
-import { getResidents, saveResidents, puroks, Resident } from '../data/mockData';
+import { puroks } from '../data/mockData';
 import { Badge } from '../components/Badge';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
+import { apiFetch } from '../lib/api';
+
+type ResidentRow = {
+  id: string;
+  name: string;
+  contactNumber: string;
+  purok: string;
+  registrationDate: string;
+  status: 'Active' | 'Inactive';
+};
 export function ResidentManagementPage() {
   const [activeTab, setActiveTab] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
-  const [residents, setResidents] = useState<Resident[]>(() => getResidents());
-  const [deleteTarget, setDeleteTarget] = useState<Resident | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [residents, setResidents] = useState<ResidentRow[]>([]);
+  const [deleteTarget, setDeleteTarget] = useState<ResidentRow | null>(null);
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [addFormData, setAddFormData] = useState({
     name: '',
@@ -30,22 +41,71 @@ export function ResidentManagementPage() {
     purok: ''
   });
   const [addErrors, setAddErrors] = useState<Record<string, string>>({});
-  const filteredResidents = residents.filter((r) => {
-    const matchesTab = activeTab === 'All' || r.purok === activeTab;
-    const matchesSearch =
-    searchQuery === '' ||
-    r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    r.contactNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    r.purok.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesTab && matchesSearch;
-  });
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setIsLoading(true);
+        const data = await apiFetch<{
+          items: Array<{
+            id: string;
+            name: string;
+            purok: string | null;
+            contactNumber: string | null;
+            isActive: boolean;
+            createdAt: string;
+          }>;
+        }>('/users?page=1&pageSize=200&role=RESIDENT');
+
+        setResidents(
+          data.items.map((u) => ({
+            id: u.id,
+            name: u.name,
+            contactNumber: u.contactNumber || '',
+            purok: u.purok || '',
+            registrationDate: u.createdAt,
+            status: u.isActive ? 'Active' : 'Inactive',
+          })),
+        );
+      } catch (e: any) {
+        toast.error(e?.message || 'Failed to load residents');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    load();
+  }, []);
+
+  const filteredResidents = useMemo(() => {
+    return residents.filter((r) => {
+      const matchesTab = activeTab === 'All' || r.purok === activeTab;
+      const matchesSearch =
+        searchQuery === '' ||
+        r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        r.contactNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        r.purok.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesTab && matchesSearch;
+    });
+  }, [residents, activeTab, searchQuery]);
+
   const handleDelete = () => {
     if (!deleteTarget) return;
-    const updated = residents.filter((r) => r.id !== deleteTarget.id);
-    setResidents(updated);
-    saveResidents(updated);
-    toast.success(`"${deleteTarget.name}" has been removed.`);
-    setDeleteTarget(null);
+    (async () => {
+      try {
+        await apiFetch(`/users/${deleteTarget.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ isActive: false }),
+        });
+        setResidents((prev) =>
+          prev.map((r) => (r.id === deleteTarget.id ? { ...r, status: 'Inactive' } : r)),
+        );
+        toast.success(`"${deleteTarget.name}" has been deactivated.`);
+      } catch (e: any) {
+        toast.error(e?.message || 'Failed to deactivate');
+      } finally {
+        setDeleteTarget(null);
+      }
+    })();
   };
   const validateAddForm = () => {
     const errors: Record<string, string> = {};
@@ -77,24 +137,11 @@ export function ResidentManagementPage() {
   const handleAddResident = (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateAddForm()) return;
-    const newResident: Resident = {
-      id: `res-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-      name: addFormData.name.trim(),
-      contactNumber: addFormData.contactNumber.replace(/\s/g, ''),
-      purok: addFormData.purok,
-      registrationDate: new Date().toISOString(),
-      status: 'Active'
-    };
-    const newResidents = [newResident, ...residents];
-    setResidents(newResidents);
-    saveResidents(newResidents);
-    toast.success(`${newResident.name} has been added as an SMS resident.`);
-    setAddModalOpen(false);
-    setAddFormData({
-      name: '',
-      contactNumber: '',
-      purok: ''
+    toast.message('Residents must sign up to be added.', {
+      description: 'Use the Sign Up page so they become real users in the database.',
     });
+    setAddModalOpen(false);
+    setAddFormData({ name: '', contactNumber: '', purok: '' });
     setAddErrors({});
   };
   return (

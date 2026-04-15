@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Calendar as CalendarIcon,
   List,
@@ -8,25 +8,39 @@ import {
   X } from
 'lucide-react';
 import { AdminLayout } from '../components/AdminLayout';
-import { getAnnouncements, checkAndUpdateScheduled } from '../data/mockData';
 import { Badge } from '../components/Badge';
 import { motion } from 'framer-motion';
+import { apiFetch } from '../lib/api';
+import type { ApiAnnouncement, UiAnnouncement } from '../lib/announcements';
+import { toUiAnnouncement } from '../lib/announcements';
 export function SchedulePage() {
   const [view, setView] = useState<'list' | 'calendar'>('list');
   const [searchQuery, setSearchQuery] = useState('');
-  checkAndUpdateScheduled();
-  const allScheduled = getAnnouncements().filter((a) => a.status === 'Pending');
-  const scheduledAnnouncements = searchQuery ?
-  allScheduled.filter(
-    (a) =>
-    a.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    a.message.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    a.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    a.targetAudience.some((t) =>
-    t.toLowerCase().includes(searchQuery.toLowerCase())
-    )
-  ) :
-  allScheduled;
+  const [isLoading, setIsLoading] = useState(true);
+  const [allScheduled, setAllScheduled] = useState<UiAnnouncement[]>([]);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setIsLoading(true);
+        const data = await apiFetch<{ items: ApiAnnouncement[] }>('/announcements?page=1&pageSize=200&status=PENDING');
+        setAllScheduled(data.items.map(toUiAnnouncement).filter((a) => a.status === 'Pending'));
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    load();
+  }, []);
+
+  const scheduledAnnouncements = searchQuery
+    ? allScheduled.filter(
+        (a) =>
+          a.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          a.message.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          String(a.category).toLowerCase().includes(searchQuery.toLowerCase()) ||
+          a.targetAudience.some((t) => t.toLowerCase().includes(searchQuery.toLowerCase())),
+      )
+    : allScheduled;
   return (
     <AdminLayout title="Scheduled Announcements">
       <div className="bg-white dark:bg-slate-800 rounded-xl shadow-soft border border-slate-100 dark:border-slate-700 overflow-hidden">

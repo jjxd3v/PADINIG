@@ -6,6 +6,8 @@ import React, {
   useContext } from
 'react';
 import { getRelativeTime } from '../data/mockData';
+import { apiFetch } from '../lib/api';
+import { getAuthUser } from '../lib/auth';
 export interface Notification {
   id: string;
   type: 'announcement' | 'emergency' | 'system';
@@ -30,7 +32,6 @@ interface NotificationContextType {
 const NotificationContext = createContext<NotificationContextType | undefined>(
   undefined
 );
-const STORAGE_KEY = 'padinig_notifications';
 // Helper to check if a notification is visible to a given purok
 function isNotificationForPurok(notif: Notification, purok: string): boolean {
   // System notifications are visible to everyone
@@ -50,71 +51,78 @@ export function NotificationProvider({
 
 
 }: {children: React.ReactNode;}) {
-  const [notifications, setNotifications] = useState<Notification[]>(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      return JSON.parse(stored);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+
+  const refresh = useCallback(async () => {
+    const user = getAuthUser();
+    if (!user) {
+      setNotifications([]);
+      return;
     }
-    return [];
-  });
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(notifications));
-  }, [notifications]);
-  // Listen for storage changes from other tabs/components
-  useEffect(() => {
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === STORAGE_KEY && e.newValue) {
-        setNotifications(JSON.parse(e.newValue));
-      }
-    };
-    window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
+    const data = await apiFetch<{
+      items: Array<{
+        id: string;
+        type: string;
+        title: string;
+        message: string;
+        category: string;
+        isRead: boolean;
+        targetAudience: string;
+        createdAt: string;
+      }>;
+    }>('/notifications?page=1&pageSize=100');
+
+    setNotifications(
+      data.items.map((n) => ({
+        id: n.id,
+        type: n.type.toLowerCase() === 'system' ? 'system' : n.type.toLowerCase() === 'emergency' ? 'emergency' : 'announcement',
+        title: n.title,
+        message: n.message,
+        category: n.category,
+        date: n.createdAt,
+        read: n.isRead,
+        targetAudience: (n.targetAudience || '')
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean),
+      })),
+    );
   }, []);
+
+  useEffect(() => {
+    refresh();
+    const interval = setInterval(refresh, 15000);
+    return () => clearInterval(interval);
+  }, [refresh]);
   // Global unread count (for admin — sees everything)
   const unreadCount = notifications.filter((n) => !n.read).length;
   const addNotification = useCallback(
     (notif: Omit<Notification, 'id' | 'read' | 'date'>) => {
-      const newNotif: Notification = {
-        ...notif,
-        id: `notif-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-        date: new Date().toISOString(),
-        read: false
-      };
-      setNotifications((prev) => {
-        const updated = [newNotif, ...prev];
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-        return updated;
-      });
+      // Notifications are created server-side. Keep this as a no-op for now.
+      void notif;
     },
     []
   );
   const markAsRead = useCallback((id: string) => {
-    setNotifications((prev) => {
-      const updated = prev.map((n) =>
-      n.id === id ?
-      {
-        ...n,
-        read: true
-      } :
-      n
-      );
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-      return updated;
-    });
-  }, []);
+    (async () => {
+      try {
+        await apiFetch(`/notifications/${id}/read`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ isRead: true }),
+        });
+        await refresh();
+      } catch {
+        // ignore
+      }
+    })();
+  }, [refresh]);
   const markAllAsRead = useCallback(() => {
-    setNotifications((prev) => {
-      const updated = prev.map((n) => ({
-        ...n,
-        read: true
-      }));
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-      return updated;
-    });
+    // No bulk endpoint yet; mark locally for UX and rely on per-item reads as needed.
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
   }, []);
   const clearAll = useCallback(() => {
     setNotifications([]);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
   }, []);
   const getRelativeTimeForNotif = useCallback((date: string) => {
     return getRelativeTime(date);

@@ -8,26 +8,20 @@ import {
   ChevronDown } from
 'lucide-react';
 import { AdminLayout } from '../components/AdminLayout';
-import {
-  getAnnouncements,
-  saveAnnouncements,
-  Announcement,
-  Category } from
-'../data/mockData';
+import type { ApiAnnouncement, UiAnnouncement } from '../lib/announcements';
+import { toUiAnnouncement } from '../lib/announcements';
+import { apiFetch } from '../lib/api';
 import { Badge } from '../components/Badge';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 export function HistoryPage() {
-  const [announcements, setAnnouncements] = useState<Announcement[]>(
-    [...getAnnouncements()].sort(
-      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-    )
-  );
+  const [announcements, setAnnouncements] = useState<UiAnnouncement[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterOpen, setFilterOpen] = useState(false);
-  const [categoryFilter, setCategoryFilter] = useState<Category | 'All'>('All');
-  const [deleteTarget, setDeleteTarget] = useState<Announcement | null>(null);
-  const categories: (Category | 'All')[] = [
+  const [categoryFilter, setCategoryFilter] = useState<string | 'All'>('All');
+  const [deleteTarget, setDeleteTarget] = useState<UiAnnouncement | null>(null);
+  const categories: (string | 'All')[] = [
   'All',
   'General',
   'Health',
@@ -35,6 +29,21 @@ export function HistoryPage() {
   'Event',
   'Government',
   'Emergency'];
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setIsLoading(true);
+        const data = await apiFetch<{ items: ApiAnnouncement[] }>('/announcements?page=1&pageSize=200');
+        setAnnouncements(data.items.map(toUiAnnouncement).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+      } catch (e: any) {
+        toast.error(e?.message || 'Failed to load history');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    load();
+  }, []);
 
   // Apply filters
   const filtered = announcements.filter((item) => {
@@ -48,13 +57,18 @@ export function HistoryPage() {
   });
   const handleDelete = () => {
     if (!deleteTarget) return;
-    const newAnnouncements = announcements.filter(
-      (a) => a.id !== deleteTarget.id
-    );
-    setAnnouncements(newAnnouncements);
-    saveAnnouncements(newAnnouncements);
-    toast.success(`"${deleteTarget.title}" has been deleted.`);
-    setDeleteTarget(null);
+    (async () => {
+      try {
+        await apiFetch(`/announcements/${deleteTarget.id}`, { method: 'DELETE' });
+        const newAnnouncements = announcements.filter((a) => a.id !== deleteTarget.id);
+        setAnnouncements(newAnnouncements);
+        toast.success(`"${deleteTarget.title}" has been deleted.`);
+      } catch (e: any) {
+        toast.error(e?.message || 'Delete failed');
+      } finally {
+        setDeleteTarget(null);
+      }
+    })();
   };
   const activeFilterCount = categoryFilter !== 'All' ? 1 : 0;
   return (

@@ -8,8 +8,6 @@ import {
   CheckCircle2,
   AlertTriangle,
   Info,
-  Moon,
-  Sun,
   Megaphone,
   Check } from
 'lucide-react';
@@ -27,7 +25,7 @@ export function AdminLayout({ children, title }: AdminLayoutProps) {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const navigate = useNavigate();
-  const { isDark, toggleTheme } = useTheme();
+  useTheme();
   const {
     notifications,
     unreadCount,
@@ -100,15 +98,6 @@ export function AdminLayout({ children, title }: AdminLayoutProps) {
             </div>
 
             <div className="flex items-center gap-3 sm:gap-5">
-              {/* Theme Toggle */}
-              <button
-                onClick={toggleTheme}
-                className="p-2 rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-700/50 dark:hover:text-slate-200 transition-all duration-200"
-                aria-label="Toggle theme">
-                
-                {isDark ? <Sun size={20} /> : <Moon size={20} />}
-              </button>
-
               {/* Notifications */}
               <div className="relative" ref={notifRef}>
                 <button

@@ -5,23 +5,13 @@ import { toast } from 'sonner';
 import { AdminLayout } from '../components/AdminLayout';
 import {
   puroks,
-  getAnnouncements,
-  saveAnnouncements,
   Category,
   DeliveryMethod } from
 '../data/mockData';
-import { useNotifications } from '../contexts/NotificationContext';
 import { motion } from 'framer-motion';
+import { apiFetch } from '../lib/api';
 export function CreateAnnouncementPage() {
   const navigate = useNavigate();
-  const { addNotification } = useNotifications();
-  const registeredUsers = JSON.parse(
-    localStorage.getItem('padinig_users') || '[]'
-  );
-  const smsResidents = JSON.parse(
-    localStorage.getItem('padinig_residents') || '[]'
-  );
-  const totalResidents = smsResidents.length + registeredUsers.length;
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
   const [category, setCategory] = useState<Category>('General');
@@ -47,53 +37,36 @@ export function CreateAnnouncementPage() {
       setSelectedPuroks(newSelection);
     }
   };
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    let announcementDate = new Date().toISOString();
-    if (isScheduled && scheduleDate && scheduleTime) {
-      announcementDate = new Date(
-        `${scheduleDate}T${scheduleTime}`
-      ).toISOString();
-    } else if (isScheduled && scheduleDate) {
-      announcementDate = new Date(`${scheduleDate}T00:00`).toISOString();
-    }
-    const newAnnouncement = {
-      id: Math.random().toString(36).substring(2, 9),
-      title,
-      message,
-      category,
-      date: announcementDate,
-      status: isScheduled ? 'Pending' : 'Sent',
-      targetAudience: selectedPuroks,
-      deliveryMethod,
-      recipientsCount: selectedPuroks.includes('All') ?
-      totalResidents :
-      selectedPuroks.length > 0 ?
-      Math.ceil(totalResidents / puroks.length * selectedPuroks.length) :
-      0
-    } as const;
-    const currentAnnouncements = getAnnouncements();
-    saveAnnouncements([newAnnouncement, ...currentAnnouncements]);
-    const audienceLabel = selectedPuroks.includes('All') ?
-    'All Residents' :
-    selectedPuroks.join(', ');
-    addNotification({
-      type: 'announcement',
-      title: isScheduled ? 'Announcement Scheduled' : 'Announcement Sent',
-      message: `"${title}" ${isScheduled ? 'scheduled' : 'sent'} to ${audienceLabel}`,
-      category,
-      targetAudience: selectedPuroks.includes('All') ?
-      ['All Residents'] :
-      selectedPuroks
-    });
-    toast.success(
-      isScheduled ?
-      `Announcement scheduled for ${audienceLabel}!` :
-      `Announcement sent to ${audienceLabel}!`
-    );
-    setTimeout(() => {
+    try {
+      const scheduledIso =
+        isScheduled && scheduleDate
+          ? new Date(`${scheduleDate}T${scheduleTime || '00:00'}`).toISOString()
+          : undefined;
+
+      const audience = selectedPuroks.includes('All') ? 'ALL' : selectedPuroks.join(', ');
+
+      await apiFetch('/announcements', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title,
+          message,
+          category,
+          status: isScheduled ? 'PENDING' : 'PUBLISHED',
+          deliveryMethod: deliveryMethod === 'SMS' ? 'SMS' : 'WEB',
+          scheduledDate: isScheduled ? scheduledIso : undefined,
+          publishedDate: isScheduled ? undefined : new Date().toISOString(),
+          targetAudience: audience,
+        }),
+      });
+
+      toast.success(isScheduled ? 'Announcement scheduled!' : 'Announcement published!');
       navigate('/dashboard');
-    }, 1500);
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to create announcement');
+    }
   };
   return (
     <AdminLayout title="Create Announcement">

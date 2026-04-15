@@ -8,28 +8,6 @@ export type Category =
 export type Status = 'Sent' | 'Pending' | 'Cancelled' | 'Draft';
 export type DeliveryMethod = 'SMS' | 'Web' | 'Both';
 
-export interface Announcement {
-  id: string;
-  title: string;
-  message: string;
-  category: Category;
-  date: string;
-  status: Status;
-  targetAudience: string[];
-  deliveryMethod: DeliveryMethod;
-  recipientsCount?: number;
-  isEmergency?: boolean;
-}
-
-export interface Resident {
-  id: string;
-  name: string;
-  contactNumber: string;
-  purok: string;
-  registrationDate: string;
-  status: 'Active' | 'Inactive';
-}
-
 export const getRelativeTime = (dateString: string): string => {
   const date = new Date(dateString);
   const now = new Date();
@@ -62,42 +40,6 @@ export const getRelativeTime = (dateString: string): string => {
     day: 'numeric',
     year: 'numeric'
   });
-};
-
-export const getAnnouncements = (): Announcement[] => {
-  const data = localStorage.getItem('padinig_announcements');
-  return data ? JSON.parse(data) : [];
-};
-
-export const saveAnnouncements = (announcements: Announcement[]) => {
-  localStorage.setItem('padinig_announcements', JSON.stringify(announcements));
-};
-
-export const checkAndUpdateScheduled = () => {
-  const announcements = getAnnouncements();
-  let updated = false;
-  const now = new Date();
-
-  const newAnnouncements = announcements.map((a) => {
-    if (a.status === 'Pending' && new Date(a.date) <= now) {
-      updated = true;
-      return { ...a, status: 'Sent' as Status };
-    }
-    return a;
-  });
-
-  if (updated) {
-    saveAnnouncements(newAnnouncements);
-  }
-};
-
-export const getResidents = (): Resident[] => {
-  const data = localStorage.getItem('padinig_residents');
-  return data ? JSON.parse(data) : [];
-};
-
-export const saveResidents = (residents: Resident[]) => {
-  localStorage.setItem('padinig_residents', JSON.stringify(residents));
 };
 
 export const puroks = [

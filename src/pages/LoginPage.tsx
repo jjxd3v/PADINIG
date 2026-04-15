@@ -3,41 +3,31 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Megaphone, Lock, User, AlertCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
+import { apiFetch } from '../lib/api';
+import { setAuthSession } from '../lib/auth';
 export function LoginPage() {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
-    setTimeout(() => {
-      // Admin credentials check
-      if (username.toLowerCase() === 'admin' && password === 'admin123') {
-        toast.success('Welcome back, Admin!');
-        navigate('/dashboard');
-        return;
-      }
-      // Check registered users from localStorage
-      const registeredUsers = JSON.parse(
-        localStorage.getItem('padinig_users') || '[]'
-      );
-      const foundUser = registeredUsers.find(
-        (u: {username: string;password: string;}) =>
-        u.username.toLowerCase() === username.toLowerCase() &&
-        u.password === password
-      );
-      if (foundUser) {
-        localStorage.setItem('padinig_current_user', foundUser.username);
-        toast.success(`Welcome, ${foundUser.fullName || username}!`);
-        navigate('/announcements');
-      } else {
-        setError('Invalid username or password. Please try again.');
-        setIsLoading(false);
-      }
-    }, 800);
+    try {
+      const data = await apiFetch<{ token: string; user: any }>('/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+      setAuthSession(data.token, data.user);
+      toast.success(`Welcome, ${data.user?.name || username}!`);
+      navigate(data.user?.role === 'ADMIN' ? '/dashboard' : '/announcements');
+    } catch (err: any) {
+      setError(err?.message || 'Login failed');
+      setIsLoading(false);
+    }
   };
   return (
     <div className="min-h-screen bg-surface-muted flex flex-col justify-center items-center px-4 py-8 sm:py-4 relative overflow-hidden">

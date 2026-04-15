@@ -3,19 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Radio, ShieldAlert } from 'lucide-react';
 import { toast } from 'sonner';
 import { AdminLayout } from '../components/AdminLayout';
-import { puroks, getAnnouncements, saveAnnouncements } from '../data/mockData';
-import { useNotifications } from '../contexts/NotificationContext';
+import { puroks } from '../data/mockData';
 import { motion } from 'framer-motion';
+import { apiFetch } from '../lib/api';
 export function EmergencyBroadcastPage() {
   const navigate = useNavigate();
-  const { addNotification } = useNotifications();
-  const registeredUsers = JSON.parse(
-    localStorage.getItem('padinig_users') || '[]'
-  );
-  const smsResidents = JSON.parse(
-    localStorage.getItem('padinig_residents') || '[]'
-  );
-  const totalResidents = smsResidents.length + registeredUsers.length;
   const [isConfirming, setIsConfirming] = useState(false);
   const [message, setMessage] = useState('URGENT: ');
   const [type, setType] = useState('');
@@ -37,41 +29,33 @@ export function EmergencyBroadcastPage() {
       setSelectedAreas(newSelection);
     }
   };
-  const handleBroadcast = (e: React.FormEvent) => {
+  const handleBroadcast = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isConfirming) {
       setIsConfirming(true);
       return;
     }
-    const newEmergency = {
-      id: Math.random().toString(36).substring(2, 9),
-      title: `Emergency Alert: ${type.toUpperCase()}`,
-      message,
-      category: 'Emergency',
-      date: new Date().toISOString(),
-      status: 'Sent',
-      targetAudience: selectedAreas.includes('All') ?
-      ['All Residents'] :
-      selectedAreas,
-      deliveryMethod: 'Both',
-      recipientsCount: selectedAreas.includes('All') ?
-      totalResidents :
-      selectedAreas.length > 0 ?
-      Math.ceil(totalResidents / puroks.length * selectedAreas.length) :
-      0,
-      isEmergency: true
-    } as const;
-    const currentAnnouncements = getAnnouncements();
-    saveAnnouncements([newEmergency, ...currentAnnouncements]);
-    addNotification({
-      type: 'emergency',
-      title: 'Emergency Broadcast Sent',
-      message: `Emergency alert "${type.toUpperCase()}" sent to ${selectedAreas.includes('All') ? 'All Residents' : selectedAreas.join(', ')}`,
-      category: 'Emergency',
-      targetAudience: selectedAreas.includes('All') ?
-      ['All Residents'] :
-      selectedAreas
-    });
+    try {
+      const audience = selectedAreas.includes('All') ? 'ALL' : selectedAreas.join(', ');
+      await apiFetch('/announcements', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: `Emergency Alert: ${type.toUpperCase()}`,
+          message,
+          category: 'Emergency',
+          status: 'PUBLISHED',
+          deliveryMethod: 'WEB',
+          publishedDate: new Date().toISOString(),
+          isEmergency: true,
+          targetAudience: audience,
+        }),
+      });
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to send emergency broadcast');
+      setIsConfirming(false);
+      return;
+    }
     toast.error('EMERGENCY BROADCAST SENT TO ALL RESIDENTS', {
       style: {
         background: '#dc2626',

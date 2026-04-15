@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState, useRef } from 'react';
-import { MessageCircle, X, Send, User, Sparkles } from 'lucide-react';
+import { X, Send, User, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-const BAI_AVATAR = "/download_(1).jpg";
+const BAI_AVATAR = "/bai-avatar.png";
 
 interface Message {
   id: string;
@@ -13,8 +13,7 @@ interface GroqMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
 }
-const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY || '';
-const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 const SYSTEM_PROMPT = `You are bAI, the friendly and helpful virtual assistant for Barangay Purisima in the Philippines. You are part of "Project Padinig," the barangay's announcement system.
 
 Your personality:
@@ -134,68 +133,37 @@ export function BantAIChat() {
     const controller = new AbortController();
     abortControllerRef.current = controller;
     try {
-      const response = await fetch(GROQ_API_URL, {
+      const response = await fetch(`${API_URL}/chat`, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${GROQ_API_KEY}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
           messages: [
           {
             role: 'system',
             content: SYSTEM_PROMPT
           },
           ...conversationRef.current],
-
-          temperature: 0.7,
-          max_tokens: 300,
-          stream: true
         }),
         signal: controller.signal
       });
       if (!response.ok) {
         throw new Error(`API error: ${response.status}`);
       }
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error('No reader available');
-      const decoder = new TextDecoder();
-      let fullText = '';
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value, {
-          stream: true
-        });
-        const lines = chunk.split('\n').filter((line) => line.trim() !== '');
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6);
-            if (data === '[DONE]') break;
-            try {
-              const parsed = JSON.parse(data);
-              const delta = parsed.choices?.[0]?.delta?.content;
-              if (delta) {
-                fullText += delta;
-                // Update the bot message with streamed content
-                setMessages((prev) =>
-                prev.map((msg) =>
-                msg.id === botMsgId ?
-                {
-                  ...msg,
-                  text: fullText
-                } :
-                msg
-                )
-                );
+      const data = await response.json();
+      const fullText = data?.data?.reply || '';
+      // Update the bot message with returned content
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === botMsgId
+            ? {
+                ...msg,
+                text: fullText
               }
-            } catch {
-
-              // Skip malformed JSON chunks
-            }}
-        }
-      }
+            : msg
+        )
+      );
       // Add completed response to conversation history
       conversationRef.current.push({
         role: 'assistant',
