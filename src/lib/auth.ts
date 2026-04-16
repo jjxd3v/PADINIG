@@ -6,6 +6,7 @@ export type AuthUser = {
   role: string;
   purok?: string | null;
   contactNumber?: string | null;
+  avatarUrl?: string | null;
   isActive: boolean;
 };
 
@@ -34,5 +35,12 @@ export function getAuthUser(): AuthUser | null {
   } catch {
     return null;
   }
+}
+
+export function updateAuthUser(patch: Partial<AuthUser>) {
+  const current = getAuthUser();
+  if (!current) return;
+  const next: AuthUser = { ...current, ...patch };
+  localStorage.setItem(USER_KEY, JSON.stringify(next));
 }
 

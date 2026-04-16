@@ -13,6 +13,8 @@ import { HistoryPage } from './pages/HistoryPage';
 import { ResidentManagementPage } from './pages/ResidentManagementPage';
 import { EmergencyBroadcastPage } from './pages/EmergencyBroadcastPage';
 import { PublicAnnouncementsPage } from './pages/PublicAnnouncementsPage';
+import { AdminProfilePage } from './pages/AdminProfilePage';
+import { AccountSettingsPage } from './pages/AccountSettingsPage';
 export function App() {
   return (
     <ThemeProvider>
@@ -36,6 +38,10 @@ export function App() {
             <Route path="/history" element={<HistoryPage />} />
             <Route path="/residents" element={<ResidentManagementPage />} />
             <Route path="/emergency" element={<EmergencyBroadcastPage />} />
+            <Route path="/admin/profile" element={<AdminProfilePage />} />
+            <Route
+              path="/admin/account-settings"
+              element={<AccountSettingsPage />} />
           </Routes>
         </Router>
       </NotificationProvider>

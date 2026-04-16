@@ -1,6 +1,10 @@
 import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { X, Send, User, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+type ChatUserProfile = {
+  name?: string | null;
+  avatarUrl?: string | null;
+};
 const BAI_AVATAR = "/bai-avatar.png";
 
 interface Message {
@@ -67,7 +71,7 @@ function getFallbackResponse(input: string): string {
   }
   return "I'm having trouble connecting right now. Please try again in a moment, or contact the Barangay Hall directly at (032) 123-4567.";
 }
-export function BantAIChat() {
+export function BantAIChat({ user }: { user?: ChatUserProfile | null }) {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
   {
@@ -284,9 +288,14 @@ export function BantAIChat() {
                 className="w-7 h-7 rounded-full object-cover shrink-0" /> :
 
 
+              user?.avatarUrl ?
+              <img
+                src={user.avatarUrl}
+                alt={user.name ? `${user.name} avatar` : 'User avatar'}
+                className="w-7 h-7 rounded-full object-cover shrink-0 border border-slate-200/60 dark:border-slate-700/60" /> :
               <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 bg-secondary/10 text-secondary">
-                      <User size={14} />
-                    </div>
+                <User size={14} />
+              </div>
               }
                   <div
                 className={`max-w-[80%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-line ${msg.sender === 'user' ? 'bg-primary text-white rounded-br-md' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-100 dark:border-slate-700 rounded-bl-md shadow-sm'}`}>

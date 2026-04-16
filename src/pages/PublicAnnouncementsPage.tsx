@@ -5,6 +5,8 @@ import {
   Search,
   BellRing,
   Bell,
+  Sun,
+  Moon,
   X,
   Calendar,
   Smartphone,
@@ -37,7 +39,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from '../contexts/ThemeContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { toast } from 'sonner';
-import { getAuthUser, clearAuthSession } from '../lib/auth';
+import { getAuthUser, clearAuthSession, updateAuthUser } from '../lib/auth';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 // Helper to get icon and color for a notification based on type/category
 function getNotificationStyle(type: string, category: string) {
   if (type === 'emergency') {
@@ -91,7 +94,7 @@ function getNotificationStyle(type: string, category: string) {
 }
 export function PublicAnnouncementsPage() {
   const navigate = useNavigate();
-  useTheme();
+  const { toggleTheme, isDark } = useTheme();
   const {
     markAsRead,
     markAllAsRead,
@@ -112,11 +115,13 @@ export function PublicAnnouncementsPage() {
   const [editProfileModalOpen, setEditProfileModalOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [editFormData, setEditFormData] = useState({
+    avatarUrl: '',
     fullName: '',
     contactNumber: '',
     password: '',
     confirmPassword: ''
   });
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   // Notification state
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
@@ -138,6 +143,7 @@ export function PublicAnnouncementsPage() {
     setCurrentUser(user);
     if (user) {
       setEditFormData({
+        avatarUrl: (user as any).avatarUrl || '',
         fullName: user.name || '',
         contactNumber: user.contactNumber || '',
         password: '',
@@ -180,12 +186,19 @@ export function PublicAnnouncementsPage() {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            avatarUrl: editFormData.avatarUrl || null,
             name: editFormData.fullName,
             contactNumber: editFormData.contactNumber,
             purok: currentUser?.purok || undefined,
           }),
         });
         setCurrentUser(updated);
+        updateAuthUser({
+          avatarUrl: updated?.avatarUrl ?? null,
+          name: updated?.name ?? editFormData.fullName,
+          contactNumber: updated?.contactNumber ?? editFormData.contactNumber,
+          purok: updated?.purok ?? currentUser?.purok ?? null,
+        });
         toast.success('Profile updated successfully');
         setEditProfileModalOpen(false);
         setEditFormData((prev) => ({
@@ -198,11 +211,7 @@ export function PublicAnnouncementsPage() {
       }
     })();
   };
-  const handleLogout = () => {
-    clearAuthSession();
-    toast.success('Logged out successfully');
-    navigate('/login');
-  };
+  const handleLogout = () => setLogoutConfirmOpen(true);
   // Get the user's purok for filtering
   const userPurok = currentUser?.purok || '';
   // Filter notifications by user's purok
@@ -374,7 +383,7 @@ export function PublicAnnouncementsPage() {
               title="Edit Profile">
               
                 <img
-                src={`https://api.dicebear.com/7.x/pixel-art/svg?seed=${encodeURIComponent(currentUser?.username || 'user')}`}
+                src={currentUser?.avatarUrl || `https://api.dicebear.com/7.x/pixel-art/svg?seed=${encodeURIComponent(currentUser?.username || 'user')}`}
                 alt="Avatar"
                 className="w-full h-full" />
               
@@ -384,7 +393,7 @@ export function PublicAnnouncementsPage() {
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full overflow-hidden shrink-0">
                     <img
-                    src={`https://api.dicebear.com/7.x/pixel-art/svg?seed=${encodeURIComponent(currentUser?.username || 'user')}`}
+                    src={currentUser?.avatarUrl || `https://api.dicebear.com/7.x/pixel-art/svg?seed=${encodeURIComponent(currentUser?.username || 'user')}`}
                     alt="Avatar"
                     className="w-full h-full" />
                   
@@ -573,6 +582,15 @@ export function PublicAnnouncementsPage() {
                 </AnimatePresence>
               </div>
 
+              {/* Theme toggle */}
+              <button
+                onClick={() => toggleTheme()}
+                className="p-2 rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-700/50 dark:hover:text-slate-200 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+                aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+                title={isDark ? 'Light mode' : 'Dark mode'}
+              >
+                {isDark ? <Sun size={20} /> : <Moon size={20} />}
+              </button>
             </div>
           </div>
         </header>
@@ -763,7 +781,7 @@ export function PublicAnnouncementsPage() {
       </div>
 
       {/* BantAI Chat Bubble */}
-      <BantAIChat />
+      <BantAIChat user={currentUser} />
 
       {/* Announcement Detail Modal */}
       <AnimatePresence>
@@ -995,6 +1013,47 @@ export function PublicAnnouncementsPage() {
               <form
               onSubmit={handleSaveProfile}
               className="p-5 sm:p-6 space-y-4 sm:space-y-5">
+
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/50 shrink-0">
+                    <img
+                      src={
+                        editFormData.avatarUrl ||
+                        currentUser?.avatarUrl ||
+                        `https://api.dicebear.com/7.x/pixel-art/svg?seed=${encodeURIComponent(currentUser?.username || 'user')}`
+                      }
+                      alt="Profile"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                      Profile Picture
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        if (file.size > 2 * 1024 * 1024) {
+                          toast.error('Please choose an image under 2MB.');
+                          return;
+                        }
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                          const url = String(reader.result || '');
+                          setEditFormData((prev) => ({ ...prev, avatarUrl: url }));
+                        };
+                        reader.readAsDataURL(file);
+                      }}
+                      className="block w-full text-sm text-slate-600 dark:text-slate-300 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary dark:file:bg-primary/20 dark:file:text-primary-light hover:file:bg-primary/15 dark:hover:file:bg-primary/25 file:cursor-pointer cursor-pointer"
+                    />
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
+                      PNG/JPG recommended. Max 2MB.
+                    </p>
+                  </div>
+                </div>
               
                 <div>
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
@@ -1105,6 +1164,22 @@ export function PublicAnnouncementsPage() {
           </motion.div>
         }
       </AnimatePresence>
+
+      <ConfirmDialog
+        open={logoutConfirmOpen}
+        title="Log out?"
+        description="Are you sure you want to log out?"
+        confirmText="Logout"
+        cancelText="Cancel"
+        danger
+        onCancel={() => setLogoutConfirmOpen(false)}
+        onConfirm={() => {
+          setLogoutConfirmOpen(false);
+          clearAuthSession();
+          toast.success('Logged out successfully');
+          navigate('/login');
+        }}
+      />
     </div>);
 
 }

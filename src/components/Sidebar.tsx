@@ -1,5 +1,5 @@
-import React from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import React, { useState } from 'react';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   Megaphone,
@@ -10,12 +10,16 @@ import {
   LogOut,
   X } from
 'lucide-react';
+import { ConfirmDialog } from './ConfirmDialog';
+import { clearAuthSession } from '../lib/auth';
 interface SidebarProps {
   isOpen: boolean;
   setIsOpen: (isOpen: boolean) => void;
 }
 export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
   const location = useLocation();
+  const navigate = useNavigate();
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const navItems = [
   {
     path: '/dashboard',
@@ -137,8 +141,9 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
         </div>
 
         <div className="p-4 border-t border-white/10 bg-black/10">
-          <NavLink
-            to="/login"
+          <button
+            type="button"
+            onClick={() => setLogoutConfirmOpen(true)}
             className="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-300 hover:bg-white/10 hover:text-white transition-all duration-200 w-full group">
             
             <LogOut
@@ -146,9 +151,25 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
               className="text-slate-400 group-hover:text-slate-300 transition-colors" />
             
             <span className="tracking-wide font-medium">Logout</span>
-          </NavLink>
+          </button>
         </div>
       </aside>
+
+      <ConfirmDialog
+        open={logoutConfirmOpen}
+        title="Log out?"
+        description="Are you sure you want to log out?"
+        confirmText="Logout"
+        cancelText="Cancel"
+        danger
+        onCancel={() => setLogoutConfirmOpen(false)}
+        onConfirm={() => {
+          setLogoutConfirmOpen(false);
+          clearAuthSession();
+          setIsOpen(false);
+          navigate('/login');
+        }}
+      />
     </>);
 
 }

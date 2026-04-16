@@ -9,13 +9,17 @@ import {
   AlertTriangle,
   Info,
   Megaphone,
-  Check } from
+  Check,
+  Sun,
+  Moon } from
 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from '../contexts/ThemeContext';
 import { useNotifications } from '../contexts/NotificationContext';
+import { ConfirmDialog } from './ConfirmDialog';
+import { clearAuthSession, getAuthUser } from '../lib/auth';
 interface AdminLayoutProps {
   children: React.ReactNode;
   title: string;
@@ -24,8 +28,9 @@ export function AdminLayout({ children, title }: AdminLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const navigate = useNavigate();
-  useTheme();
+  const { toggleTheme, isDark } = useTheme();
   const {
     notifications,
     unreadCount,
@@ -35,6 +40,16 @@ export function AdminLayout({ children, title }: AdminLayoutProps) {
   } = useNotifications();
   const notifRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
+
+  const authUser = getAuthUser();
+  const displayName = authUser?.name || 'Admin User';
+  const displayEmail = authUser?.email || 'admin@purisima.gov.ph';
+  const initials = (displayName || 'A')
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase())
+    .join('') || 'A';
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (
@@ -209,6 +224,16 @@ export function AdminLayout({ children, title }: AdminLayoutProps) {
                 </AnimatePresence>
               </div>
 
+              {/* Theme toggle */}
+              <button
+                onClick={() => toggleTheme()}
+                className="p-2 rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-700/50 dark:hover:text-slate-200 transition-colors"
+                aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+                title={isDark ? 'Light mode' : 'Dark mode'}
+              >
+                {isDark ? <Sun size={20} /> : <Moon size={20} />}
+              </button>
+
               {/* Profile */}
               <div className="relative" ref={profileRef}>
                 <button
@@ -218,7 +243,7 @@ export function AdminLayout({ children, title }: AdminLayoutProps) {
                   }}
                   className={`h-9 w-9 rounded-full bg-gradient-to-br from-primary to-primary-light text-white flex items-center justify-center font-bold text-sm shadow-md hover:shadow-lg transition-all border-2 ${profileOpen ? 'border-primary/30 ring-2 ring-primary/10' : 'border-white dark:border-slate-700'}`}>
                   
-                  A
+                  {initials}
                 </button>
 
                 <AnimatePresence>
@@ -247,25 +272,40 @@ export function AdminLayout({ children, title }: AdminLayoutProps) {
                     
                       <div className="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
                         <p className="font-bold text-slate-800 dark:text-white">
-                          Admin User
+                          {displayName}
                         </p>
                         <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-0.5">
-                          admin@purisima.gov.ph
+                          {displayEmail}
                         </p>
                       </div>
                       <div className="p-2">
-                        <button className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-primary dark:hover:text-primary-light hover:bg-primary/5 dark:hover:bg-primary/10 rounded-xl transition-colors">
+                        <button
+                          onClick={() => {
+                            setProfileOpen(false);
+                            navigate('/admin/profile');
+                          }}
+                          className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-primary dark:hover:text-primary-light hover:bg-primary/5 dark:hover:bg-primary/10 rounded-xl transition-colors">
+                          
                           <User size={16} />
                           My Profile
                         </button>
-                        <button className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-primary dark:hover:text-primary-light hover:bg-primary/5 dark:hover:bg-primary/10 rounded-xl transition-colors">
+                        <button
+                          onClick={() => {
+                            setProfileOpen(false);
+                            navigate('/admin/account-settings');
+                          }}
+                          className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-primary dark:hover:text-primary-light hover:bg-primary/5 dark:hover:bg-primary/10 rounded-xl transition-colors">
+                          
                           <Settings size={16} />
                           Account Settings
                         </button>
                       </div>
                       <div className="p-2 border-t border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
                         <button
-                        onClick={() => navigate('/login')}
+                        onClick={() => {
+                          setProfileOpen(false);
+                          setLogoutConfirmOpen(true);
+                        }}
                         className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-bold text-emergency hover:bg-emergency/10 rounded-xl transition-colors">
                         
                           <LogOut size={16} />
@@ -290,6 +330,21 @@ export function AdminLayout({ children, title }: AdminLayoutProps) {
           </div>
         </main>
       </div>
+
+      <ConfirmDialog
+        open={logoutConfirmOpen}
+        title="Log out?"
+        description="Are you sure you want to log out?"
+        confirmText="Logout"
+        cancelText="Cancel"
+        danger
+        onCancel={() => setLogoutConfirmOpen(false)}
+        onConfirm={() => {
+          setLogoutConfirmOpen(false);
+          clearAuthSession();
+          navigate('/login');
+        }}
+      />
     </div>);
 
 }

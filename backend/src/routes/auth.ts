@@ -26,11 +26,12 @@ const signupSchema = z.object({
   name: z.string().min(1),
   purok: z.string().optional(),
   contactNumber: z.string().optional(),
+  avatarUrl: z.string().optional(),
 });
 
 router.post('/signup', validateBody(signupSchema), async (req, res, next) => {
   try {
-    const { username, email, password, name, purok, contactNumber } = req.body as z.infer<typeof signupSchema>;
+    const { username, email, password, name, purok, contactNumber, avatarUrl } = req.body as z.infer<typeof signupSchema>;
 
     const existingUsername = await prisma.user.findUnique({ where: { username } });
     if (existingUsername) return res.status(409).json(fail('Username already in use', { code: 'USERNAME_TAKEN' }));
@@ -50,6 +51,7 @@ router.post('/signup', validateBody(signupSchema), async (req, res, next) => {
         role: 'RESIDENT',
         purok,
         contactNumber,
+        avatarUrl: avatarUrl ?? null,
         isActive: true,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -62,6 +64,7 @@ router.post('/signup', validateBody(signupSchema), async (req, res, next) => {
         role: true,
         purok: true,
         contactNumber: true,
+        avatarUrl: true,
         isActive: true,
         createdAt: true,
         updatedAt: true,
@@ -103,6 +106,7 @@ router.post('/login', validateBody(loginSchema), async (req, res, next) => {
           role: user.role,
           purok: user.purok,
           contactNumber: user.contactNumber,
+          avatarUrl: user.avatarUrl,
           isActive: user.isActive,
           createdAt: user.createdAt,
           updatedAt: user.updatedAt,
@@ -126,6 +130,7 @@ router.get('/me', requireAuth, async (req, res, next) => {
         role: true,
         purok: true,
         contactNumber: true,
+        avatarUrl: true,
         isActive: true,
         createdAt: true,
         updatedAt: true,
@@ -142,17 +147,19 @@ const updateMeSchema = z.object({
   name: z.string().min(1).optional(),
   contactNumber: z.string().min(1).optional(),
   purok: z.string().min(1).optional(),
+  avatarUrl: z.string().max(2_000_000).nullable().optional(),
 });
 
 router.patch('/me', requireAuth, validateBody(updateMeSchema), async (req, res, next) => {
   try {
-    const { name, contactNumber, purok } = req.body as z.infer<typeof updateMeSchema>;
+    const { name, contactNumber, purok, avatarUrl } = req.body as z.infer<typeof updateMeSchema>;
     const updated = await prisma.user.update({
       where: { id: req.user!.id },
       data: {
         ...(name !== undefined ? { name } : {}),
         ...(contactNumber !== undefined ? { contactNumber } : {}),
         ...(purok !== undefined ? { purok } : {}),
+        ...(avatarUrl !== undefined ? { avatarUrl } : {}),
         updatedAt: new Date(),
       },
       select: {
@@ -163,6 +170,7 @@ router.patch('/me', requireAuth, validateBody(updateMeSchema), async (req, res, 
         role: true,
         purok: true,
         contactNumber: true,
+        avatarUrl: true,
         isActive: true,
         createdAt: true,
         updatedAt: true,

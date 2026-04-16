@@ -49,6 +49,7 @@ function mapStatus(status: string): 'Sent' | 'Pending' | 'Cancelled' | 'Draft' {
 function mapDelivery(method: string): 'SMS' | 'Web' | 'Both' {
   const m = (method || '').toUpperCase();
   if (m === 'SMS') return 'SMS';
+  if (m === 'BOTH') return 'Both';
   // Backend uses WEB for web platform.
   return 'Web';
 }

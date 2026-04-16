@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Send, Clock, Smartphone, Globe, Info } from 'lucide-react';
 import { toast } from 'sonner';
@@ -20,6 +20,19 @@ export function CreateAnnouncementPage() {
   const [scheduleTime, setScheduleTime] = useState('');
   const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>('Both');
   const [selectedPuroks, setSelectedPuroks] = useState<string[]>(['All']);
+  const [totalResidents, setTotalResidents] = useState(0);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const data = await apiFetch<{ total: number }>('/users?page=1&pageSize=1&role=RESIDENT');
+        setTotalResidents(data.total);
+      } catch {
+        setTotalResidents(0);
+      }
+    };
+    load();
+  }, []);
   const handlePurokToggle = (purok: string) => {
     if (purok === 'All') {
       setSelectedPuroks(['All']);
@@ -55,7 +68,8 @@ export function CreateAnnouncementPage() {
           message,
           category,
           status: isScheduled ? 'PENDING' : 'PUBLISHED',
-          deliveryMethod: deliveryMethod === 'SMS' ? 'SMS' : 'WEB',
+          deliveryMethod:
+            deliveryMethod === 'SMS' ? 'SMS' : deliveryMethod === 'Both' ? 'BOTH' : 'WEB',
           scheduledDate: isScheduled ? scheduledIso : undefined,
           publishedDate: isScheduled ? undefined : new Date().toISOString(),
           targetAudience: audience,
@@ -106,7 +120,7 @@ export function CreateAnnouncementPage() {
                   </label>
                   <select
                     value={category}
-                    onChange={(e) => setCategory(e.target.value)}
+                    onChange={(e) => setCategory(e.target.value as Category)}
                     className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors bg-white dark:bg-slate-700 dark:text-white">
                     
                     <option value="General">General Information</option>
@@ -121,7 +135,7 @@ export function CreateAnnouncementPage() {
                   </label>
                   <select
                     value={deliveryMethod}
-                    onChange={(e) => setDeliveryMethod(e.target.value)}
+                    onChange={(e) => setDeliveryMethod(e.target.value as DeliveryMethod)}
                     className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors bg-white dark:bg-slate-700 dark:text-white">
                     
                     <option value="Both">SMS & Web Platform</option>
