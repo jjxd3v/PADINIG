@@ -56,15 +56,15 @@ export function LandingPage() {
           <div className="flex justify-between items-center h-14 sm:h-16">
             <div className="flex items-center gap-2 sm:gap-3">
               <div
-                className={`p-1.5 sm:p-2 rounded-lg transition-colors ${scrolled ? 'bg-primary dark:bg-primary-light' : 'bg-white'}`}>
+                className="p-1.5 sm:p-2 rounded-lg bg-accent">
                 
                 <Megaphone
                   size={20}
-                  className={`sm:w-6 sm:h-6 ${scrolled ? 'text-accent' : 'text-primary'}`} />
+                  className="sm:w-6 sm:h-6 text-primary-dark" />
                 
               </div>
               <span
-                className={`font-bold text-base sm:text-lg transition-colors ${scrolled ? 'text-primary dark:text-white' : 'text-white'}`}>
+                className="font-bold text-base sm:text-lg text-accent">
                 
                 Project Padinig
               </span>

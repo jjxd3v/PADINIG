@@ -45,14 +45,14 @@ export function LoginPage() {
           y: 0
         }}
         transition={{
-          duration: 0.5
+          duration: 0.5,
         }}
-        className="w-full max-w-md relative z-10">
-        
+        className="w-full max-w-md relative z-10"
+      >
         <div className="text-center mb-5 sm:mb-8">
           <Link to="/" className="inline-block">
-            <div className="inline-flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl bg-primary text-white mb-3 sm:mb-4 shadow-lg shadow-primary/20">
-              <Megaphone size={24} className="sm:w-8 sm:h-8 text-accent" />
+            <div className="inline-flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl bg-accent text-white mb-3 sm:mb-4 shadow-lg shadow-accent/20">
+              <Megaphone size={24} className="sm:w-8 sm:h-8 text-primary-dark" />
             </div>
           </Link>
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">

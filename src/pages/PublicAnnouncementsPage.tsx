@@ -293,11 +293,11 @@ export function PublicAnnouncementsPage() {
           <div
             className={`flex items-center gap-3 ${sidebarCollapsed ? 'hidden' : 'flex'}`}>
             
-            <div className="bg-white/10 p-2 rounded-lg shrink-0">
-              <Megaphone size={20} className="text-accent" />
+            <div className="bg-accent p-2 rounded-lg shrink-0">
+              <Megaphone size={20} className="text-primary-dark" />
             </div>
             <div className="overflow-hidden">
-              <h1 className="font-bold text-sm leading-tight whitespace-nowrap">
+              <h1 className="font-bold text-sm leading-tight whitespace-nowrap text-accent">
                 Barangay Purisima
               </h1>
               <p className="text-[10px] text-slate-300 uppercase tracking-wider whitespace-nowrap">
@@ -307,8 +307,8 @@ export function PublicAnnouncementsPage() {
           </div>
 
           {sidebarCollapsed &&
-          <div className="bg-white/10 p-2 rounded-lg shrink-0">
-              <Megaphone size={20} className="text-accent" />
+          <div className="bg-accent p-2 rounded-lg shrink-0">
+              <Megaphone size={20} className="text-primary-dark" />
             </div>
           }
 
@@ -454,21 +454,21 @@ export function PublicAnnouncementsPage() {
                 <Menu size={24} />
               </button>
               <div className="flex items-center gap-2.5">
-                <div className="bg-primary/10 dark:bg-primary/20 p-1.5 rounded-lg">
+                <div className="bg-accent p-1.5 rounded-lg">
                   <Megaphone
                     size={20}
-                    className="text-primary dark:text-primary-light" />
+                    className="text-primary-dark" />
                   
                 </div>
                 <div className="hidden sm:block">
-                  <h1 className="font-bold text-slate-800 dark:text-white text-base leading-tight tracking-tight">
+                  <h1 className="font-bold text-accent text-base leading-tight tracking-tight">
                     Barangay Purisima
                   </h1>
                   <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-wider font-medium">
                     Resident Portal
                   </p>
                 </div>
-                <h1 className="sm:hidden font-bold text-slate-800 dark:text-white text-base leading-tight">
+                <h1 className="sm:hidden font-bold text-accent text-base leading-tight">
                   Barangay Purisima
                 </h1>
               </div>
@@ -597,12 +597,11 @@ export function PublicAnnouncementsPage() {
 
         <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-10">
           {/* Page Title (Desktop) */}
-          <div className="hidden lg:flex items-center gap-4 mb-8">
-            <div className="bg-primary/10 dark:bg-primary/20 p-3 rounded-2xl">
+          <div className="hidden lg:flex items-center gap-4 mb-8 p-5 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
+            <div className="bg-accent p-3.5 rounded-xl">
               <Megaphone
-                size={28}
-                className="text-primary dark:text-primary-light" />
-              
+                size={32}
+                className="text-primary-dark" />
             </div>
             <div>
               <h1 className="text-2xl lg:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">

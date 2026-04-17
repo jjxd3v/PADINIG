@@ -68,11 +68,11 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
         
         <div className="flex items-center justify-between p-6 border-b border-white/10">
           <div className="flex items-center gap-3">
-            <div className="bg-white/10 p-2.5 rounded-xl shadow-inner">
-              <Megaphone size={24} className="text-accent" />
+            <div className="bg-accent p-2.5 rounded-xl shadow-inner">
+              <Megaphone size={24} className="text-primary-dark" />
             </div>
             <div>
-              <h1 className="font-bold text-lg leading-tight tracking-wide">
+              <h1 className="font-bold text-lg leading-tight tracking-wide text-accent">
                 Project Padinig
               </h1>
               <p className="text-xs text-slate-400 font-medium uppercase tracking-widest mt-0.5">

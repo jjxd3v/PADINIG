@@ -7,9 +7,7 @@ import {
   Phone,
   MapPin,
   ArrowLeft,
-  CheckCircle,
-  Eye,
-  EyeOff } from
+  CheckCircle } from
 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
@@ -27,7 +25,6 @@ export function SignUpPage() {
     purok: ''
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [showPassword, setShowPassword] = useState(false);
   const updateField = (field: string, value: string) => {
     setFormData((prev) => ({
       ...prev,
@@ -120,8 +117,8 @@ export function SignUpPage() {
         
         <div className="text-center mb-4 sm:mb-6">
           <Link to="/" className="inline-block">
-            <div className="inline-flex items-center justify-center w-11 h-11 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-primary text-white mb-2 sm:mb-3 shadow-lg shadow-primary/20">
-              <Megaphone size={22} className="sm:w-7 sm:h-7 text-accent" />
+            <div className="inline-flex items-center justify-center w-11 h-11 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-accent text-white mb-2 sm:mb-3 shadow-lg shadow-accent/20">
+              <Megaphone size={22} className="sm:w-7 sm:h-7 text-primary-dark" />
             </div>
           </Link>
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
@@ -204,25 +201,13 @@ export function SignUpPage() {
                     
                   </div>
                   <input
-                    type={showPassword ? 'text' : 'password'}
+                    type="password"
                     required
                     value={formData.password}
                     onChange={(e) => updateField('password', e.target.value)}
-                    className={`block w-full pl-8 sm:pl-10 pr-8 sm:pr-9 py-2.5 border rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors bg-slate-50 focus:bg-white text-base ${errors.password ? 'border-emergency' : 'border-slate-200'}`}
+                    className={`block w-full pl-8 sm:pl-10 pr-3 py-2.5 border rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors bg-slate-50 focus:bg-white text-base ${errors.password ? 'border-emergency' : 'border-slate-200'}`}
                     placeholder="Min. 6 chars" />
                   
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 pr-2 sm:pr-2.5 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
-                    tabIndex={-1}>
-                    
-                    {showPassword ?
-                    <EyeOff size={14} className="sm:w-4 sm:h-4" /> :
-
-                    <Eye size={14} className="sm:w-4 sm:h-4" />
-                    }
-                  </button>
                 </div>
                 {errors.password &&
                 <p className="text-[10px] sm:text-xs text-emergency mt-1">

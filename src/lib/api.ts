@@ -1,6 +1,6 @@
 import { getAuthToken } from './auth';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4001';
 
 export type ApiError = { message: string; code?: string; details?: unknown };
 export type ApiResponse<T> = { success: true; data: T; error: null } | { success: false; data: null; error: ApiError };
