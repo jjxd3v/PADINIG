@@ -38,11 +38,11 @@ function isNotificationForPurok(notif: Notification, purok: string): boolean {
   if (notif.type === 'system') return true;
   // If no targetAudience set, visible to everyone (backward compat)
   if (!notif.targetAudience || notif.targetAudience.length === 0) return true;
-  // Check if targeted to all or the specific purok
+  // Check if targeted to all or the specific purok (case-insensitive)
   return notif.targetAudience.some(
     (t) =>
-    t === 'All' ||
-    t === 'All Residents' ||
+    t.toLowerCase() === 'all' ||
+    t.toLowerCase() === 'all residents' ||
     t.toLowerCase() === purok.toLowerCase()
   );
 }

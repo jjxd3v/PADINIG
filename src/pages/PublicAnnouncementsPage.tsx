@@ -96,11 +96,11 @@ export function PublicAnnouncementsPage() {
   const navigate = useNavigate();
   const { toggleTheme, isDark } = useTheme();
   const {
+    notifications,
+    unreadCount,
     markAsRead,
     markAllAsRead,
-    getRelativeTimeForNotif,
-    getNotificationsForPurok,
-    getUnreadCountForPurok
+    getRelativeTimeForNotif
   } = useNotifications();
   const [activeCategory, setActiveCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
@@ -212,20 +212,18 @@ export function PublicAnnouncementsPage() {
     })();
   };
   const handleLogout = () => setLogoutConfirmOpen(true);
-  // Get the user's purok for filtering
-  const userPurok = currentUser?.purok || '';
-  // Filter notifications by user's purok
-  const notifications = getNotificationsForPurok(userPurok);
-  const unreadCount = getUnreadCountForPurok(userPurok);
+  // Notifications are already filtered by userId from backend
+  // No need for additional purok filtering since each notification is user-specific
   // Filter announcements: only show those targeted to the user's purok or "All"
+  const userPurok = currentUser?.purok || '';
   const visibleAnnouncements = publicAnnouncements
     .filter((a) => a.status === 'Sent')
     .filter((a) => {
       if (!userPurok) return true;
       return a.targetAudience.some(
         (t) =>
-          t === 'All' ||
-          t === 'All Residents' ||
+          t.toLowerCase() === 'all' ||
+          t.toLowerCase() === 'all residents' ||
           t.toLowerCase() === userPurok.toLowerCase()
       );
     })

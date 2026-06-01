@@ -131,15 +131,61 @@ export function ResidentManagementPage() {
     setAddErrors(errors);
     return Object.keys(errors).length === 0;
   };
-  const handleAddResident = (e: React.FormEvent) => {
+  const handleAddResident = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateAddForm()) return;
-    toast.message('Residents must sign up to be added.', {
-      description: 'Use the Sign Up page so they become real users in the database.',
-    });
-    setAddModalOpen(false);
-    setAddFormData({ name: '', contactNumber: '', purok: '' });
-    setAddErrors({});
+    
+    try {
+      const data = await apiFetch<{
+        user: {
+          id: string;
+          name: string;
+          contactNumber: string | null;
+          purok: string | null;
+          isActive: boolean;
+          createdAt: string;
+        };
+        defaultPassword: string;
+      }>('/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: addFormData.name,
+          contactNumber: addFormData.contactNumber.replace(/\s/g, ''),
+          purok: addFormData.purok,
+        }),
+      });
+
+      // Add the new resident to the list
+      setResidents((prev) => [
+        {
+          id: data.user.id,
+          name: data.user.name,
+          contactNumber: data.user.contactNumber || '',
+          purok: data.user.purok || '',
+          registrationDate: data.user.createdAt,
+          status: data.user.isActive ? 'Active' : 'Inactive',
+        },
+        ...prev,
+      ]);
+
+      toast.success(`"${data.user.name}" has been added as a resident.`, {
+        description: `Username: ${data.user.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}, Default password: ${data.defaultPassword}`,
+      });
+
+      setAddModalOpen(false);
+      setAddFormData({ name: '', contactNumber: '', purok: '' });
+      setAddErrors({});
+    } catch (err: any) {
+      if (err?.code === 'CONTACT_TAKEN') {
+        setAddErrors({ contactNumber: 'This contact number is already registered' });
+        toast.error('This contact number is already registered.');
+      } else if (err?.code === 'USERNAME_TAKEN') {
+        toast.error('Username conflict. Please try a different name.');
+      } else {
+        toast.error(err?.message || 'Failed to add resident');
+      }
+    }
   };
   return (
     <AdminLayout title="Resident Management">

@@ -8,11 +8,116 @@ import { validateBody } from '../middleware/validate.js';
 
 const router = Router();
 
+// Helper: Create notifications for all targeted users when an announcement is published
+async function createNotificationsForAnnouncement(announcement: {
+  id: string;
+  title: string;
+  message: string;
+  category: string;
+  isEmergency: boolean;
+  targetAudience: string;
+}) {
+  try {
+    console.log(`[DEBUG] Creating notifications for announcement: ${announcement.id}`);
+    console.log(`[DEBUG] Target audience: "${announcement.targetAudience}"`);
+    
+    // Parse target audience
+    const targets = announcement.targetAudience
+      .split(',')
+      .map((t) => t.trim())
+      .filter(Boolean);
+    
+    console.log(`[DEBUG] Parsed targets:`, targets);
+
+    // Determine which users should receive this notification
+    // Check for "All" case-insensitively
+    const hasAllTarget = targets.some(t => 
+      t.toLowerCase() === 'all' || 
+      t.toLowerCase() === 'all residents'
+    );
+    
+    const whereClause =
+      targets.length === 0 || hasAllTarget
+        ? { isActive: true } // All active users
+        : {
+            isActive: true,
+            purok: { in: targets },
+          };
+    
+    console.log(`[DEBUG] Where clause:`, JSON.stringify(whereClause));
+
+    // Find all targeted users
+    const users = await prisma.user.findMany({
+      where: whereClause,
+      select: { id: true, purok: true, name: true },
+    });
+    
+    console.log(`[DEBUG] Found ${users.length} targeted users`);
+    if (users.length > 0) {
+      console.log(`[DEBUG] First few users:`, users.slice(0, 3));
+    }
+
+    // Create a notification for each user
+    const now = new Date();
+    const notificationData = users.map((user) => ({
+      id: crypto.randomUUID(),
+      type: announcement.isEmergency ? 'EMERGENCY' : 'ANNOUNCEMENT',
+      title: announcement.title,
+      message: announcement.message.substring(0, 200) + (announcement.message.length > 200 ? '...' : ''),
+      category: announcement.category,
+      isRead: false,
+      targetAudience: announcement.targetAudience,
+      createdAt: now,
+      userId: user.id,
+      announcementId: announcement.id,
+    }));
+
+    console.log(`[DEBUG] Creating ${notificationData.length} notifications`);
+
+    if (notificationData.length > 0) {
+      const result = await prisma.notification.createMany({
+        data: notificationData,
+      });
+      
+      console.log(`[DEBUG] Created ${result.count} notifications in DB`);
+
+      // Update the announcement's recipients count
+      await prisma.announcement.update({
+        where: { id: announcement.id },
+        data: { recipientsCount: notificationData.length },
+      });
+    }
+
+    return notificationData.length;
+  } catch (error) {
+    console.error('[DEBUG] Failed to create notifications:', error);
+    return 0;
+  }
+}
+
 // Public: published announcements only
 router.get('/public', async (req, res, next) => {
   try {
     // Promote due scheduled announcements to published (simple stateless scheduler)
     const now = new Date();
+
+    // First find the announcements that are due
+    const dueAnnouncements = await prisma.announcement.findMany({
+      where: {
+        status: 'PENDING',
+        scheduledDate: { lte: now },
+      },
+      select: {
+        id: true,
+        title: true,
+        message: true,
+        category: true,
+        isEmergency: true,
+        targetAudience: true,
+      },
+    });
+
+    // Update them to published
     await prisma.announcement.updateMany({
       where: {
         status: 'PENDING',
@@ -24,6 +129,18 @@ router.get('/public', async (req, res, next) => {
         updatedAt: now,
       },
     });
+
+    // Create notifications for each newly published announcement
+    for (const ann of dueAnnouncements) {
+      await createNotificationsForAnnouncement({
+        id: ann.id,
+        title: ann.title,
+        message: ann.message,
+        category: ann.category,
+        isEmergency: ann.isEmergency,
+        targetAudience: ann.targetAudience,
+      });
+    }
 
     const page = parseIntParam(req.query.page, 1, { min: 1 });
     const pageSize = parseIntParam(req.query.pageSize, 20, { min: 1, max: 100 });
@@ -175,6 +292,12 @@ const createSchema = z.object({
 router.post('/', validateBody(createSchema), async (req, res, next) => {
   try {
     const body = req.body as z.infer<typeof createSchema>;
+    
+    console.log(`[DEBUG] POST /announcements - status: ${body.status}, targetAudience: "${body.targetAudience}"`);
+
+    const isPublished = (body.status ?? 'PENDING') === 'PUBLISHED';
+    
+    console.log(`[DEBUG] isPublished: ${isPublished}`);
 
     const created = await prisma.announcement.create({
       data: {
@@ -185,7 +308,7 @@ router.post('/', validateBody(createSchema), async (req, res, next) => {
         status: body.status ?? 'PENDING',
         deliveryMethod: body.deliveryMethod ?? 'WEB',
         scheduledDate: body.scheduledDate ? new Date(body.scheduledDate) : null,
-        publishedDate: body.publishedDate ? new Date(body.publishedDate) : null,
+        publishedDate: isPublished || body.publishedDate ? new Date() : null,
         isEmergency: body.isEmergency ?? false,
         targetAudience: body.targetAudience ?? '',
         recipientsCount: 0,
@@ -211,6 +334,18 @@ router.post('/', validateBody(createSchema), async (req, res, next) => {
       },
     });
 
+    // Create notifications for targeted users if announcement is published
+    if (isPublished) {
+      await createNotificationsForAnnouncement({
+        id: created.id,
+        title: created.title,
+        message: created.message,
+        category: created.category,
+        isEmergency: created.isEmergency,
+        targetAudience: created.targetAudience,
+      });
+    }
+
     return res.status(201).json(ok(created));
   } catch (err) {
     return next(err);
@@ -235,6 +370,14 @@ router.patch('/:id', validateBody(updateSchema), async (req, res, next) => {
     const id = req.params.id;
     const body = req.body as z.infer<typeof updateSchema>;
 
+    // Check if announcement is currently pending
+    const current = await prisma.announcement.findUnique({
+      where: { id },
+      select: { status: true },
+    });
+
+    const isBeingPublished = body.status === 'PUBLISHED' && current?.status !== 'PUBLISHED';
+
     const updated = await prisma.announcement.update({
       where: { id },
       data: {
@@ -249,6 +392,7 @@ router.patch('/:id', validateBody(updateSchema), async (req, res, next) => {
         ...(body.publishedDate !== undefined
           ? { publishedDate: body.publishedDate === null ? null : new Date(body.publishedDate) }
           : {}),
+        ...(isBeingPublished ? { publishedDate: new Date() } : {}),
         ...(body.isEmergency !== undefined ? { isEmergency: body.isEmergency } : {}),
         ...(body.targetAudience !== undefined ? { targetAudience: body.targetAudience } : {}),
         ...(body.recipientsCount !== undefined ? { recipientsCount: body.recipientsCount } : {}),
@@ -271,6 +415,18 @@ router.patch('/:id', validateBody(updateSchema), async (req, res, next) => {
         author: { select: { id: true, name: true, email: true } },
       },
     });
+
+    // Create notifications for targeted users if being published for the first time
+    if (isBeingPublished) {
+      await createNotificationsForAnnouncement({
+        id: updated.id,
+        title: updated.title,
+        message: updated.message,
+        category: updated.category,
+        isEmergency: updated.isEmergency,
+        targetAudience: updated.targetAudience,
+      });
+    }
 
     return res.json(ok(updated));
   } catch (err) {
