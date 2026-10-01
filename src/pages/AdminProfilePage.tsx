@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { AdminLayout } from '../components/AdminLayout';
 import { apiFetch } from '../lib/api';
 import { getAuthUser, updateAuthUser } from '../lib/auth';
+import { puroks } from '../data/mockData';
 
 type ProfileForm = {
   name: string;
@@ -152,12 +153,18 @@ export function AdminProfilePage() {
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
                 Purok / Zone (optional)
               </label>
-              <input
+              <select
                 value={form.purok}
                 onChange={(e) => onChange('purok', e.target.value)}
-                className="w-full px-4 py-3 min-h-[44px] border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 dark:text-white dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
-                placeholder="e.g., Purok 1"
-              />
+                className="w-full px-4 py-3 min-h-[44px] border border-slate-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors cursor-pointer"
+              >
+                <option value="">Select Purok / Zone</option>
+                {puroks.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="pt-2 flex items-center justify-end gap-3">

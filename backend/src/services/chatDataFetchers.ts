@@ -1,7 +1,5 @@
 // Data fetchers for chatbot intent responses
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '../lib/prisma.js';
 
 export interface AnnouncementData {
   id: string;

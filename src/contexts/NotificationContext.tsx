@@ -104,6 +104,10 @@ export function NotificationProvider({
     []
   );
   const markAsRead = useCallback((id: string) => {
+    // Optimistically mark as read immediately
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+    );
     (async () => {
       try {
         await apiFetch(`/notifications/${id}/read`, {
@@ -111,16 +115,25 @@ export function NotificationProvider({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ isRead: true }),
         });
+      } catch (err) {
+        console.error('Failed to mark notification as read:', err);
         await refresh();
-      } catch {
-        // ignore
       }
     })();
   }, [refresh]);
-  const markAllAsRead = useCallback(() => {
-    // No bulk endpoint yet; mark locally for UX and rely on per-item reads as needed.
+
+  const markAllAsRead = useCallback(async () => {
+    // Optimistically mark all as read immediately so notification count removes instantly
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-  }, []);
+    try {
+      await apiFetch('/notifications/read-all', {
+        method: 'PATCH',
+      });
+    } catch (err) {
+      console.error('Failed to mark all notifications as read:', err);
+      await refresh();
+    }
+  }, [refresh]);
   const clearAll = useCallback(() => {
     setNotifications([]);
   }, []);

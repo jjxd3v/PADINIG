@@ -146,13 +146,23 @@ router.get('/me', requireAuth, async (req, res, next) => {
 const updateMeSchema = z.object({
   name: z.string().min(1).optional(),
   contactNumber: z.string().min(1).optional(),
-  purok: z.string().min(1).optional(),
+  purok: z.string().nullable().optional(),
   avatarUrl: z.string().max(2_000_000).nullable().optional(),
+  password: z.string().min(6).optional(),
 });
 
 router.patch('/me', requireAuth, validateBody(updateMeSchema), async (req, res, next) => {
   try {
-    const { name, contactNumber, purok, avatarUrl } = req.body as z.infer<typeof updateMeSchema>;
+    const { name, contactNumber, purok, avatarUrl, password } = req.body as z.infer<typeof updateMeSchema>;
+
+    let passwordHash: string | undefined;
+    if (password && password.trim().length > 0) {
+      if (password.length < 6) {
+        return res.status(400).json(fail('Password must be at least 6 characters', { code: 'WEAK_PASSWORD' }));
+      }
+      passwordHash = await bcrypt.hash(password, 10);
+    }
+
     const updated = await prisma.user.update({
       where: { id: req.user!.id },
       data: {
@@ -160,6 +170,7 @@ router.patch('/me', requireAuth, validateBody(updateMeSchema), async (req, res, 
         ...(contactNumber !== undefined ? { contactNumber } : {}),
         ...(purok !== undefined ? { purok } : {}),
         ...(avatarUrl !== undefined ? { avatarUrl } : {}),
+        ...(passwordHash ? { password: passwordHash } : {}),
         updatedAt: new Date(),
       },
       select: {
@@ -177,6 +188,34 @@ router.patch('/me', requireAuth, validateBody(updateMeSchema), async (req, res, 
       },
     });
     return res.json(ok(updated));
+  } catch (err) {
+    return next(err);
+  }
+});
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().optional(),
+  newPassword: z.string().min(6),
+});
+
+router.post('/change-password', requireAuth, validateBody(changePasswordSchema), async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword } = req.body as z.infer<typeof changePasswordSchema>;
+    const user = await prisma.user.findUnique({ where: { id: req.user!.id } });
+    if (!user) return res.status(404).json(fail('User not found', { code: 'NOT_FOUND' }));
+
+    if (currentPassword) {
+      const match = await bcrypt.compare(currentPassword, user.password);
+      if (!match) return res.status(400).json(fail('Current password is incorrect', { code: 'INVALID_PASSWORD' }));
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await prisma.user.update({
+      where: { id: req.user!.id },
+      data: { password: passwordHash, updatedAt: new Date() },
+    });
+
+    return res.json(ok({ message: 'Password changed successfully' }));
   } catch (err) {
     return next(err);
   }

@@ -57,7 +57,7 @@ function getGroqKey(): string {
 }
 
 function getGroqModel(): string {
-  return (process.env.GROQ_MODEL?.trim() || 'llama-3.1-8b-instant');
+  return (process.env.GROQ_MODEL?.trim() || 'qwen/qwen3.8-27b');
 }
 
 interface ChatResponse {
@@ -311,11 +311,21 @@ async function getAIResponse(prompt: string, context?: { name?: string; purok?: 
   });
 
   if (!resp.ok) {
+    const errorBody = await resp.text().catch(() => '');
+    console.error(`[Chat] Groq API error (${resp.status}):`, errorBody);
     throw new Error(`Groq API error: ${resp.status}`);
   }
 
   const data = (await resp.json()) as any;
-  return data?.choices?.[0]?.message?.content || '';
+  const content = data?.choices?.[0]?.message?.content;
+  if (content && typeof content === 'string' && content.trim()) {
+    return content.trim();
+  }
+  const reasoning = data?.choices?.[0]?.message?.reasoning;
+  if (reasoning && typeof reasoning === 'string' && reasoning.trim()) {
+    return reasoning.trim();
+  }
+  return 'Kumusta! Ako si BantAI, ang imong Barangay Assistant. Unsay akong matabang nimo karon?';
 }
 
 router.post('/', validateBody(chatSchema), async (req, res, next) => {
@@ -340,10 +350,24 @@ router.post('/', validateBody(chatSchema), async (req, res, next) => {
       response = await processIntent(intentResult.intent, lastUserMessage, userContext, languageResult.language);
     } catch (intentError) {
       console.error('[Chat] Intent processing error:', intentError);
-      // Fallback to general AI response
-      const prompt = buildGeneralPrompt(lastUserMessage, userContext);
-      const reply = await getAIResponse(prompt, userContext, languageResult.language);
-      response = { reply, intent: 'GENERAL', detectedLanguage: languageResult.language };
+      try {
+        // Fallback to general AI response
+        const prompt = buildGeneralPrompt(lastUserMessage, userContext);
+        const reply = await getAIResponse(prompt, userContext, languageResult.language);
+        response = { reply, intent: 'GENERAL', detectedLanguage: languageResult.language };
+      } catch (fallbackError) {
+        console.error('[Chat] AI Fallback error:', fallbackError);
+        const nameGreeting = userContext?.name ? `, ${userContext.name}` : '';
+        response = {
+          reply: `Kumusta${nameGreeting}! Ako si BantAI, ang imong Barangay Assistant. Naa koy gamay nga problema sa koneksyon, apan pwede nimo basahon ang mga pinakabag-ong anunsyo o motawag sa barangay hall.`,
+          intent: 'GENERAL',
+          detectedLanguage: languageResult.language,
+          actions: [
+            { type: 'view_announcements', label: 'View Announcements' },
+            { type: 'contact_barangay', label: 'Contact Barangay' },
+          ],
+        };
+      }
     }
     
     // Add detected language to response

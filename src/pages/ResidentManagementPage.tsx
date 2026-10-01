@@ -8,7 +8,9 @@ import {
   Phone,
   User,
   MapPin,
-  Smartphone } from
+  Smartphone,
+  Edit2,
+  Lock } from
 'lucide-react';
 import { AdminLayout } from '../components/AdminLayout';
 import { puroks } from '../data/mockData';
@@ -31,6 +33,14 @@ export function ResidentManagementPage() {
   const [, setIsLoading] = useState(true);
   const [residents, setResidents] = useState<ResidentRow[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<ResidentRow | null>(null);
+  const [editTarget, setEditTarget] = useState<ResidentRow | null>(null);
+  const [editFormData, setEditFormData] = useState({
+    name: '',
+    contactNumber: '',
+    purok: '',
+    password: '',
+  });
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [addFormData, setAddFormData] = useState({
     name: '',
@@ -103,6 +113,75 @@ export function ResidentManagementPage() {
         setDeleteTarget(null);
       }
     })();
+  };
+
+  const handleOpenEdit = (resident: ResidentRow) => {
+    setEditTarget(resident);
+    setEditFormData({
+      name: resident.name,
+      contactNumber: resident.contactNumber,
+      purok: resident.purok,
+      password: '',
+    });
+  };
+
+  const handleSaveEditResident = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editTarget) return;
+    if (!editFormData.name.trim()) {
+      toast.error('Resident name is required');
+      return;
+    }
+    if (!editFormData.purok) {
+      toast.error('Please select a Purok');
+      return;
+    }
+    if (editFormData.password && editFormData.password.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return;
+    }
+
+    setIsSavingEdit(true);
+    try {
+      const payload: Record<string, any> = {
+        name: editFormData.name.trim(),
+        contactNumber: editFormData.contactNumber.trim() || null,
+        purok: editFormData.purok,
+      };
+      if (editFormData.password) {
+        payload.password = editFormData.password;
+      }
+
+      await apiFetch(`/users/${editTarget.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      setResidents((prev) =>
+        prev.map((r) =>
+          r.id === editTarget.id
+            ? {
+                ...r,
+                name: editFormData.name.trim(),
+                contactNumber: editFormData.contactNumber.trim(),
+                purok: editFormData.purok,
+              }
+            : r
+        )
+      );
+
+      toast.success(
+        editFormData.password
+          ? `Resident "${editFormData.name.trim()}" and password updated successfully.`
+          : `Resident "${editFormData.name.trim()}" updated successfully.`
+      );
+      setEditTarget(null);
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to update resident');
+    } finally {
+      setIsSavingEdit(false);
+    }
   };
   const validateAddForm = () => {
     const errors: Record<string, string> = {};
@@ -296,10 +375,17 @@ export function ResidentManagementPage() {
                   </td>
                   <td className="p-4 text-right">
                     <button
-                    onClick={() => setDeleteTarget(resident)}
-                    className="p-2 text-emergency hover:bg-emergency/10 rounded-lg transition-colors"
-                    title="Delete resident">
-                    
+                      onClick={() => handleOpenEdit(resident)}
+                      className="p-2 text-primary hover:bg-primary/10 dark:text-primary-light dark:hover:bg-primary/20 rounded-lg transition-colors mr-1"
+                      title="Edit resident / Transfer Purok"
+                    >
+                      <Edit2 size={16} />
+                    </button>
+                    <button
+                      onClick={() => setDeleteTarget(resident)}
+                      className="p-2 text-emergency hover:bg-emergency/10 rounded-lg transition-colors"
+                      title="Delete resident"
+                    >
                       <Trash2 size={16} />
                     </button>
                   </td>
@@ -349,7 +435,7 @@ export function ResidentManagementPage() {
           transition={{
             duration: 0.2
           }}
-          className="fixed inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center p-4 overflow-y-auto"
           onClick={() => setAddModalOpen(false)}>
           
             <motion.div
@@ -373,11 +459,11 @@ export function ResidentManagementPage() {
               stiffness: 300,
               damping: 25
             }}
-            className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 w-full max-w-md overflow-hidden"
+            className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 w-full max-w-md max-h-[calc(100dvh-2rem)] sm:max-h-[90vh] flex flex-col overflow-hidden my-auto"
             onClick={(e) => e.stopPropagation()}>
             
               {/* Modal Header */}
-              <div className="p-5 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50">
+              <div className="p-5 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50 shrink-0">
                 <h3 className="font-bold text-lg text-slate-800 dark:text-white flex items-center gap-2">
                   <UserPlus
                   size={20}
@@ -396,151 +482,150 @@ export function ResidentManagementPage() {
                 </button>
               </div>
 
-              {/* Info Banner */}
-              <div className="mx-5 mt-5 bg-blue-50 dark:bg-blue-900/20 p-3 rounded-xl flex items-start gap-2.5 border border-blue-100 dark:border-blue-800/30">
-                <Smartphone
-                size={18}
-                className="text-blue-500 dark:text-blue-400 mt-0.5 shrink-0" />
-              
-                <div>
-                  <p className="text-xs font-semibold text-blue-700 dark:text-blue-300 mb-0.5">
-                    SMS-Only Resident
-                  </p>
-                  <p className="text-[11px] text-blue-600 dark:text-blue-400 leading-relaxed">
-                    For residents using keypad phones who can't register via the
-                    web app. They will receive announcements via SMS to their
-                    registered number.
-                  </p>
-                </div>
-              </div>
-
               {/* Form */}
-              <form onSubmit={handleAddResident} className="p-5 space-y-4">
-                {/* Full Name */}
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-                    Full Name
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <User size={16} className="text-slate-400" />
-                    </div>
-                    <input
-                    type="text"
-                    required
-                    value={addFormData.name}
-                    onChange={(e) => {
-                      setAddFormData({
-                        ...addFormData,
-                        name: e.target.value
-                      });
-                      if (addErrors.name)
-                      setAddErrors({
-                        ...addErrors,
-                        name: ''
-                      });
-                    }}
-                    placeholder="e.g., Maria Santos"
-                    className={`w-full pl-10 pr-4 py-3 min-h-[44px] border rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors bg-white dark:bg-slate-700 dark:text-white dark:placeholder-slate-400 text-sm ${addErrors.name ? 'border-emergency' : 'border-slate-200 dark:border-slate-600'}`} />
+              <form onSubmit={handleAddResident} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+                <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-4">
+                  {/* Info Banner */}
+                  <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-xl flex items-start gap-2.5 border border-blue-100 dark:border-blue-800/30">
+                    <Smartphone
+                    size={18}
+                    className="text-blue-500 dark:text-blue-400 mt-0.5 shrink-0" />
                   
-                  </div>
-                  {addErrors.name &&
-                <p className="text-xs text-emergency mt-1">
-                      {addErrors.name}
-                    </p>
-                }
-                </div>
-
-                {/* Contact Number */}
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-                    Contact Number
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Phone size={16} className="text-slate-400" />
+                    <div>
+                      <p className="text-xs font-semibold text-blue-700 dark:text-blue-300 mb-0.5">
+                        SMS-Only Resident
+                      </p>
+                      <p className="text-[11px] text-blue-600 dark:text-blue-400 leading-relaxed">
+                        For residents using keypad phones who can't register via the
+                        web app. They will receive announcements via SMS to their
+                        registered number.
+                      </p>
                     </div>
-                    <input
-                    type="tel"
-                    required
-                    maxLength={11}
-                    value={addFormData.contactNumber}
-                    onChange={(e) => {
-                      const val = e.target.value.
-                      replace(/[^\d]/g, '').
-                      slice(0, 11);
-                      setAddFormData({
-                        ...addFormData,
-                        contactNumber: val
-                      });
-                      if (addErrors.contactNumber)
-                      setAddErrors({
-                        ...addErrors,
-                        contactNumber: ''
-                      });
-                    }}
-                    placeholder="09XX XXX XXXX"
-                    className={`w-full pl-10 pr-4 py-3 min-h-[44px] border rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors bg-white dark:bg-slate-700 dark:text-white dark:placeholder-slate-400 text-sm font-mono ${addErrors.contactNumber ? 'border-emergency' : 'border-slate-200 dark:border-slate-600'}`} />
-                  
                   </div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                    {addFormData.contactNumber.length}/11 digits — This number
-                    will receive SMS announcements.
-                  </p>
-                  {addErrors.contactNumber &&
-                <p className="text-xs text-emergency mt-1">
-                      {addErrors.contactNumber}
-                    </p>
-                }
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                    This number will receive SMS announcements.
-                  </p>
-                </div>
 
-                {/* Purok/Zone */}
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-                    Purok / Zone
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <MapPin size={16} className="text-slate-400" />
-                    </div>
-                    <select
-                    required
-                    value={addFormData.purok}
-                    onChange={(e) => {
-                      setAddFormData({
-                        ...addFormData,
-                        purok: e.target.value
-                      });
-                      if (addErrors.purok)
-                      setAddErrors({
-                        ...addErrors,
-                        purok: ''
-                      });
-                    }}
-                    className={`w-full pl-10 pr-4 py-3 min-h-[44px] border rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors bg-white dark:bg-slate-700 dark:text-white text-sm appearance-none ${addErrors.purok ? 'border-emergency' : 'border-slate-200 dark:border-slate-600'} ${!addFormData.purok ? 'text-slate-400' : ''}`}>
+                  {/* Full Name */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                      Full Name
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <User size={16} className="text-slate-400" />
+                      </div>
+                      <input
+                      type="text"
+                      required
+                      value={addFormData.name}
+                      onChange={(e) => {
+                        setAddFormData({
+                          ...addFormData,
+                          name: e.target.value
+                        });
+                        if (addErrors.name)
+                        setAddErrors({
+                          ...addErrors,
+                          name: ''
+                        });
+                      }}
+                      placeholder="e.g., Maria Santos"
+                      className={`w-full pl-10 pr-4 py-3 min-h-[44px] border rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors bg-white dark:bg-slate-700 dark:text-white dark:placeholder-slate-400 text-sm ${addErrors.name ? 'border-emergency' : 'border-slate-200 dark:border-slate-600'}`} />
                     
-                      <option value="" disabled>
-                        Select Purok
-                      </option>
-                      {puroks.map((p) =>
-                    <option key={p} value={p}>
-                          {p}
-                        </option>
-                    )}
-                    </select>
+                    </div>
+                    {addErrors.name &&
+                  <p className="text-xs text-emergency mt-1">
+                        {addErrors.name}
+                      </p>
+                  }
                   </div>
-                  {addErrors.purok &&
-                <p className="text-xs text-emergency mt-1">
-                      {addErrors.purok}
+
+                  {/* Contact Number */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                      Contact Number
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Phone size={16} className="text-slate-400" />
+                      </div>
+                      <input
+                      type="tel"
+                      required
+                      maxLength={11}
+                      value={addFormData.contactNumber}
+                      onChange={(e) => {
+                        const val = e.target.value.
+                        replace(/[^\d]/g, '').
+                        slice(0, 11);
+                        setAddFormData({
+                          ...addFormData,
+                          contactNumber: val
+                        });
+                        if (addErrors.contactNumber)
+                        setAddErrors({
+                          ...addErrors,
+                          contactNumber: ''
+                        });
+                      }}
+                      placeholder="09XX XXX XXXX"
+                      className={`w-full pl-10 pr-4 py-3 min-h-[44px] border rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors bg-white dark:bg-slate-700 dark:text-white dark:placeholder-slate-400 text-sm font-mono ${addErrors.contactNumber ? 'border-emergency' : 'border-slate-200 dark:border-slate-600'}`} />
+                    
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                      {addFormData.contactNumber.length}/11 digits — This number
+                      will receive SMS announcements.
                     </p>
-                }
+                    {addErrors.contactNumber &&
+                  <p className="text-xs text-emergency mt-1">
+                        {addErrors.contactNumber}
+                      </p>
+                  }
+                  </div>
+
+                  {/* Purok/Zone */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                      Purok / Zone
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <MapPin size={16} className="text-slate-400" />
+                      </div>
+                      <select
+                      required
+                      value={addFormData.purok}
+                      onChange={(e) => {
+                        setAddFormData({
+                          ...addFormData,
+                          purok: e.target.value
+                        });
+                        if (addErrors.purok)
+                        setAddErrors({
+                          ...addErrors,
+                          purok: ''
+                        });
+                      }}
+                      className={`w-full pl-10 pr-4 py-3 min-h-[44px] border rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors bg-white dark:bg-slate-700 dark:text-white text-sm appearance-none ${addErrors.purok ? 'border-emergency' : 'border-slate-200 dark:border-slate-600'} ${!addFormData.purok ? 'text-slate-400' : ''}`}>
+                      
+                        <option value="" disabled>
+                          Select Purok
+                        </option>
+                        {puroks.map((p) =>
+                      <option key={p} value={p}>
+                            {p}
+                          </option>
+                      )}
+                      </select>
+                    </div>
+                    {addErrors.purok &&
+                  <p className="text-xs text-emergency mt-1">
+                        {addErrors.purok}
+                      </p>
+                  }
+                  </div>
                 </div>
 
                 {/* Actions */}
-                <div className="pt-2 flex flex-col sm:flex-row gap-3">
+                <div className="p-4 sm:p-5 border-t border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50 shrink-0 flex flex-col sm:flex-row gap-3">
                   <button
                   type="button"
                   onClick={() => {
@@ -641,6 +726,172 @@ export function ResidentManagementPage() {
             </motion.div>
           </motion.div>
         }
+      </AnimatePresence>
+
+      {/* Edit Resident Modal */}
+      <AnimatePresence>
+        {editTarget && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center p-4 overflow-y-auto"
+            onClick={() => setEditTarget(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+              className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 w-full max-w-md max-h-[calc(100dvh-2rem)] sm:max-h-[90vh] flex flex-col overflow-hidden my-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50 shrink-0">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 dark:bg-primary/20 flex items-center justify-center text-primary dark:text-primary-light">
+                    <Edit2 size={18} />
+                  </div>
+                  <h3 className="font-bold text-lg text-slate-800 dark:text-white">
+                    Edit Resident
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setEditTarget(null)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Modal Form */}
+              <form onSubmit={handleSaveEditResident} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+                <div className="flex-1 overflow-y-auto custom-scrollbar p-5 sm:p-6 space-y-4">
+                  {/* Full Name */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                      Full Name
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <User size={16} className="text-slate-400" />
+                      </div>
+                      <input
+                        type="text"
+                        required
+                        value={editFormData.name}
+                        onChange={(e) =>
+                          setEditFormData({
+                            ...editFormData,
+                            name: e.target.value,
+                          })
+                        }
+                        className="w-full pl-10 pr-4 py-3 min-h-[44px] border border-slate-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors bg-white dark:bg-slate-700 dark:text-white text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Contact Number */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                      Contact Number
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Phone size={16} className="text-slate-400" />
+                      </div>
+                      <input
+                        type="tel"
+                        maxLength={11}
+                        value={editFormData.contactNumber}
+                        onChange={(e) =>
+                          setEditFormData({
+                            ...editFormData,
+                            contactNumber: e.target.value.replace(/[^\d]/g, '').slice(0, 11),
+                          })
+                        }
+                        className="w-full pl-10 pr-4 py-3 min-h-[44px] border border-slate-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors bg-white dark:bg-slate-700 dark:text-white text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Purok/Zone Transfer Dropdown */}
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+                      <MapPin size={16} className="text-primary dark:text-primary-light" />
+                      Purok / Zone (Transfer)
+                    </label>
+                    <select
+                      required
+                      value={editFormData.purok}
+                      onChange={(e) =>
+                        setEditFormData({
+                          ...editFormData,
+                          purok: e.target.value,
+                        })
+                      }
+                      className="w-full px-4 py-3 min-h-[44px] border border-slate-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors bg-white dark:bg-slate-700 dark:text-white text-sm cursor-pointer"
+                    >
+                      <option value="" disabled>
+                        Select Purok
+                      </option>
+                      {puroks.map((p) => (
+                        <option key={p} value={p}>
+                          {p}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
+                      Changing this will transfer the resident to the selected Purok immediately.
+                    </p>
+                  </div>
+
+                  {/* Password Reset (Optional) */}
+                  <div className="pt-2 border-t border-slate-100 dark:border-slate-700">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+                      <Lock size={15} className="text-slate-400" />
+                      Reset Password (Optional)
+                    </label>
+                    <input
+                      type="password"
+                      placeholder="Leave blank to keep current password"
+                      value={editFormData.password}
+                      onChange={(e) =>
+                        setEditFormData({
+                          ...editFormData,
+                          password: e.target.value,
+                        })
+                      }
+                      className="w-full px-4 py-3 min-h-[44px] border border-slate-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors bg-white dark:bg-slate-700 dark:text-white dark:placeholder-slate-400 text-sm"
+                    />
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
+                      Enter at least 6 characters if you want to reset their password.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="p-4 sm:p-5 border-t border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50 shrink-0 flex flex-col sm:flex-row gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setEditTarget(null)}
+                    className="w-full sm:flex-1 min-h-[44px] py-3 px-4 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 text-sm font-semibold rounded-xl transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSavingEdit}
+                    className="w-full sm:flex-1 min-h-[44px] py-3 px-4 bg-primary hover:bg-primary-light disabled:opacity-60 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm"
+                  >
+                    {isSavingEdit ? 'Saving...' : 'Save Changes'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
       </AnimatePresence>
     </AdminLayout>);
 

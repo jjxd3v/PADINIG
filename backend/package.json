@@ -5,11 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc -p tsconfig.json",
+    "build": "prisma generate && tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate deploy",
-    "prisma:migrate:dev": "prisma migrate dev",
+    "prisma:push": "prisma db push",
     "prisma:studio": "prisma studio",
     "seed": "tsx prisma/seed.ts",
     "cleanup": "tsx prisma/cleanup.ts"
@@ -22,6 +21,7 @@
     "express": "^4.19.2",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
+    "nodemailer": "^10.0.10",
     "zod": "^3.23.8"
   },
   "devDependencies": {
@@ -30,9 +30,9 @@
     "@types/express": "^4.17.21",
     "@types/jsonwebtoken": "^9.0.6",
     "@types/node": "^20.14.9",
+    "@types/nodemailer": "^8.0.1",
     "prisma": "^5.19.1",
     "tsx": "^4.16.2",
     "typescript": "^5.5.3"
   }
 }
-

@@ -46,6 +46,34 @@ router.get('/', async (req, res, next) => {
   }
 });
 
+router.patch('/read-all', async (req, res, next) => {
+  try {
+    const userId = req.user!.id;
+    const result = await prisma.notification.updateMany({
+      where: { userId, isRead: false },
+      data: { isRead: true },
+    });
+
+    return res.json(ok({ count: result.count }));
+  } catch (err) {
+    return next(err);
+  }
+});
+
+router.post('/read-all', async (req, res, next) => {
+  try {
+    const userId = req.user!.id;
+    const result = await prisma.notification.updateMany({
+      where: { userId, isRead: false },
+      data: { isRead: true },
+    });
+
+    return res.json(ok({ count: result.count }));
+  } catch (err) {
+    return next(err);
+  }
+});
+
 const markReadSchema = z.object({
   isRead: z.boolean().optional(),
 });

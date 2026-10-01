@@ -3,12 +3,12 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "mongodb"
   url      = env("DATABASE_URL")
 }
 
 model User {
-  id            String   @id
+  id            String   @id @map("_id")
   username      String   @unique
   email         String?  @unique
   password      String
@@ -28,7 +28,7 @@ model User {
 }
 
 model Announcement {
-  id              String    @id
+  id              String    @id @map("_id")
   title           String
   message         String
   category        String
@@ -52,7 +52,7 @@ model Announcement {
 }
 
 model Notification {
-  id             String    @id
+  id             String    @id @map("_id")
   type           String    @default("ANNOUNCEMENT")
   title          String
   message        String

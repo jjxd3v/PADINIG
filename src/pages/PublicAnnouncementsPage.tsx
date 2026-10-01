@@ -27,8 +27,13 @@ import {
   Edit,
   User,
   Info,
-  Settings } from
+  Settings,
+  Lock,
+  Eye,
+  EyeOff,
+  MapPin } from
 'lucide-react';
+import { puroks } from '../data/mockData';
 import type { ApiAnnouncement } from '../lib/announcements';
 import { toUiAnnouncement, type UiAnnouncement } from '../lib/announcements';
 import { apiFetch } from '../lib/api';
@@ -114,14 +119,36 @@ export function PublicAnnouncementsPage() {
   // Profile state
   const [editProfileModalOpen, setEditProfileModalOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [editFormData, setEditFormData] = useState({
     avatarUrl: '',
     fullName: '',
     contactNumber: '',
+    purok: '',
     password: '',
     confirmPassword: ''
   });
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
+
+  const handleOpenEditProfile = () => {
+    const user = getAuthUser();
+    if (user) {
+      setCurrentUser(user);
+      setEditFormData({
+        avatarUrl: (user as any).avatarUrl || '',
+        fullName: user.name || '',
+        contactNumber: user.contactNumber || '',
+        purok: user.purok || '',
+        password: '',
+        confirmPassword: ''
+      });
+    }
+    setShowPassword(false);
+    setShowConfirmPassword(false);
+    setEditProfileModalOpen(true);
+  };
   // Notification state
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
@@ -146,6 +173,7 @@ export function PublicAnnouncementsPage() {
         avatarUrl: (user as any).avatarUrl || '',
         fullName: user.name || '',
         contactNumber: user.contactNumber || '',
+        purok: user.purok || '',
         password: '',
         confirmPassword: ''
       });
@@ -171,45 +199,66 @@ export function PublicAnnouncementsPage() {
     const interval = setInterval(fetchAnnouncements, 15000);
     return () => clearInterval(interval);
   }, []);
-  const handleSaveProfile = (e: React.FormEvent) => {
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (
-    editFormData.password &&
-    editFormData.password !== editFormData.confirmPassword)
-    {
-      toast.error('Passwords do not match');
+    if (!editFormData.fullName.trim()) {
+      toast.error('Full name is required');
       return;
     }
-    (async () => {
-      try {
-        const updated = await apiFetch<any>('/auth/me', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            avatarUrl: editFormData.avatarUrl || null,
-            name: editFormData.fullName,
-            contactNumber: editFormData.contactNumber,
-            purok: currentUser?.purok || undefined,
-          }),
-        });
-        setCurrentUser(updated);
-        updateAuthUser({
-          avatarUrl: updated?.avatarUrl ?? null,
-          name: updated?.name ?? editFormData.fullName,
-          contactNumber: updated?.contactNumber ?? editFormData.contactNumber,
-          purok: updated?.purok ?? currentUser?.purok ?? null,
-        });
-        toast.success('Profile updated successfully');
-        setEditProfileModalOpen(false);
-        setEditFormData((prev) => ({
-          ...prev,
-          password: '',
-          confirmPassword: ''
-        }));
-      } catch (err: any) {
-        toast.error(err?.message || 'Failed to update profile');
+    if (editFormData.password) {
+      if (editFormData.password.length < 6) {
+        toast.error('New password must be at least 6 characters');
+        return;
       }
-    })();
+      if (editFormData.password !== editFormData.confirmPassword) {
+        toast.error('Passwords do not match');
+        return;
+      }
+    }
+
+    setIsSavingProfile(true);
+    try {
+      const payload: Record<string, any> = {
+        avatarUrl: editFormData.avatarUrl || null,
+        name: editFormData.fullName.trim(),
+        contactNumber: editFormData.contactNumber.trim(),
+        purok: editFormData.purok || null,
+      };
+
+      if (editFormData.password) {
+        payload.password = editFormData.password;
+      }
+
+      const updated = await apiFetch<any>('/auth/me', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      setCurrentUser(updated);
+      updateAuthUser({
+        avatarUrl: updated?.avatarUrl ?? null,
+        name: updated?.name ?? editFormData.fullName,
+        contactNumber: updated?.contactNumber ?? editFormData.contactNumber,
+        purok: updated?.purok ?? editFormData.purok ?? null,
+      });
+
+      toast.success(
+        editFormData.password
+          ? 'Profile and password updated successfully!'
+          : 'Profile updated successfully!'
+      );
+      setEditProfileModalOpen(false);
+      setEditFormData((prev) => ({
+        ...prev,
+        password: '',
+        confirmPassword: ''
+      }));
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to update profile');
+    } finally {
+      setIsSavingProfile(false);
+    }
   };
   const handleLogout = () => setLogoutConfirmOpen(true);
   // Notifications are already filtered by userId from backend
@@ -376,7 +425,7 @@ export function PublicAnnouncementsPage() {
             
             {sidebarCollapsed ?
             <button
-              onClick={() => setEditProfileModalOpen(true)}
+              onClick={handleOpenEditProfile}
               className="w-8 h-8 rounded-full overflow-hidden hover:ring-2 ring-accent transition-all"
               title="Edit Profile">
               
@@ -408,7 +457,7 @@ export function PublicAnnouncementsPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <button
-                  onClick={() => setEditProfileModalOpen(true)}
+                  onClick={handleOpenEditProfile}
                   className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-xs font-medium text-white transition-colors">
                   
                     <Edit size={12} /> Edit
@@ -517,9 +566,19 @@ export function PublicAnnouncementsPage() {
                         <h3 className="font-bold text-slate-800 dark:text-white text-sm">
                           Notifications
                         </h3>
-                        <span className="text-xs font-medium text-primary dark:text-primary-light bg-primary/10 dark:bg-primary/20 px-2 py-0.5 rounded-full">
-                          {unreadCount} new
-                        </span>
+                        <div className="flex items-center gap-2">
+                          {unreadCount > 0 && (
+                            <button
+                              onClick={() => markAllAsRead()}
+                              className="text-xs font-medium text-primary hover:text-primary-light dark:text-primary-light dark:hover:text-primary transition-colors hover:underline"
+                            >
+                              Mark all as read
+                            </button>
+                          )}
+                          <span className="text-xs font-medium text-primary dark:text-primary-light bg-primary/10 dark:bg-primary/20 px-2 py-0.5 rounded-full">
+                            {unreadCount} new
+                          </span>
+                        </div>
                       </div>
                       <div className="max-h-80 overflow-y-auto custom-scrollbar">
                         {notifications.length === 0 ?
@@ -565,16 +624,22 @@ export function PublicAnnouncementsPage() {
                       })
                       }
                       </div>
-                      {notifications.length > 0 &&
-                    <div className="p-3 text-center border-t border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
-                          <button
-                        onClick={() => markAllAsRead()}
-                        className="text-sm font-semibold text-primary dark:text-primary-light hover:underline transition-colors">
-                        
-                            Mark all as read
-                          </button>
+                      {notifications.length > 0 && (
+                        <div className="p-3 text-center border-t border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
+                          {unreadCount > 0 ? (
+                            <button
+                              onClick={() => markAllAsRead()}
+                              className="text-sm font-semibold text-primary dark:text-primary-light hover:underline transition-colors"
+                            >
+                              Mark all as read
+                            </button>
+                          ) : (
+                            <span className="text-xs text-slate-400 dark:text-slate-500 font-medium">
+                              All caught up
+                            </span>
+                          )}
                         </div>
-                    }
+                      )}
                     </motion.div>
                   }
                 </AnimatePresence>
@@ -964,7 +1029,7 @@ export function PublicAnnouncementsPage() {
           transition={{
             duration: 0.2
           }}
-          className="fixed inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center p-4 sm:p-6"
+          className="fixed inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center p-4 sm:p-6 overflow-y-auto"
           onClick={() => setEditProfileModalOpen(false)}>
           
             <motion.div
@@ -988,10 +1053,10 @@ export function PublicAnnouncementsPage() {
               stiffness: 300,
               damping: 25
             }}
-            className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 w-full max-w-md overflow-hidden"
+            className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 w-full max-w-md max-h-[calc(100dvh-2rem)] sm:max-h-[90vh] flex flex-col overflow-hidden my-auto"
             onClick={(e) => e.stopPropagation()}>
             
-              <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50">
+              <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50 shrink-0">
                 <h3 className="font-bold text-lg text-slate-800 dark:text-white flex items-center gap-2">
                   <User
                   size={20}
@@ -1009,7 +1074,8 @@ export function PublicAnnouncementsPage() {
 
               <form
               onSubmit={handleSaveProfile}
-              className="p-5 sm:p-6 space-y-4 sm:space-y-5">
+              className="flex flex-col flex-1 min-h-0 overflow-hidden">
+                <div className="flex-1 overflow-y-auto custom-scrollbar p-5 sm:p-6 space-y-4 sm:space-y-5">
 
                 <div className="flex items-center gap-4">
                   <div className="w-16 h-16 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/50 shrink-0">
@@ -1095,8 +1161,36 @@ export function PublicAnnouncementsPage() {
                   </p>
                 </div>
 
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+                    <MapPin size={16} className="text-primary dark:text-primary-light" />
+                    Purok / Zone
+                  </label>
+                  <select
+                    value={editFormData.purok}
+                    onChange={(e) =>
+                      setEditFormData({
+                        ...editFormData,
+                        purok: e.target.value
+                      })
+                    }
+                    className="w-full px-4 py-3 min-h-[44px] border border-slate-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors bg-white dark:bg-slate-700 dark:text-white text-sm sm:text-base cursor-pointer"
+                  >
+                    <option value="">Select your Purok / Zone</option>
+                    {puroks.map((p) => (
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500 mt-1">
+                    Transferring puroks will update announcements and alerts tailored to your zone.
+                  </p>
+                </div>
+
                 <div className="pt-4 sm:pt-5 border-t border-slate-100 dark:border-slate-700">
-                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3 sm:mb-4">
+                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3 sm:mb-4 flex items-center gap-1.5">
+                    <Lock size={14} className="text-primary dark:text-primary-light" />
                     Change Password (Optional)
                   </p>
 
@@ -1105,43 +1199,77 @@ export function PublicAnnouncementsPage() {
                       <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
                         New Password
                       </label>
-                      <input
-                      type="password"
-                      value={editFormData.password}
-                      onChange={(e) =>
-                      setEditFormData({
-                        ...editFormData,
-                        password: e.target.value
-                      })
-                      }
-                      placeholder="Leave blank to keep current"
-                      className="w-full px-4 py-3 min-h-[44px] border border-slate-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors bg-white dark:bg-slate-700 dark:text-white dark:placeholder-slate-400 text-sm sm:text-base" />
-                    
+                      <div className="relative">
+                        <input
+                          type={showPassword ? 'text' : 'password'}
+                          value={editFormData.password}
+                          onChange={(e) =>
+                            setEditFormData({
+                              ...editFormData,
+                              password: e.target.value
+                            })
+                          }
+                          placeholder="Leave blank to keep current"
+                          className="w-full pl-4 pr-11 py-3 min-h-[44px] border border-slate-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors bg-white dark:bg-slate-700 dark:text-white dark:placeholder-slate-400 text-sm sm:text-base"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 p-1"
+                        >
+                          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </button>
+                      </div>
+                      <p className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500 mt-1">
+                        Minimum 6 characters. Leave blank if you don't want to change password.
+                      </p>
                     </div>
 
-                    {editFormData.password &&
-                  <div>
+                    {editFormData.password && (
+                      <div>
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
                           Confirm New Password
                         </label>
-                        <input
-                      type="password"
-                      required={!!editFormData.password}
-                      value={editFormData.confirmPassword}
-                      onChange={(e) =>
-                      setEditFormData({
-                        ...editFormData,
-                        confirmPassword: e.target.value
-                      })
-                      }
-                      className="w-full px-4 py-3 min-h-[44px] border border-slate-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors bg-white dark:bg-slate-700 dark:text-white text-sm sm:text-base" />
-                    
+                        <div className="relative">
+                          <input
+                            type={showConfirmPassword ? 'text' : 'password'}
+                            required={!!editFormData.password}
+                            value={editFormData.confirmPassword}
+                            onChange={(e) =>
+                              setEditFormData({
+                                ...editFormData,
+                                confirmPassword: e.target.value
+                              })
+                            }
+                            placeholder="Re-enter new password"
+                            className={`w-full pl-4 pr-11 py-3 min-h-[44px] border rounded-xl focus:ring-2 focus:ring-primary/20 transition-colors bg-white dark:bg-slate-700 dark:text-white dark:placeholder-slate-400 text-sm sm:text-base ${
+                              editFormData.confirmPassword &&
+                              editFormData.password !== editFormData.confirmPassword
+                                ? 'border-emergency focus:border-emergency'
+                                : 'border-slate-200 dark:border-slate-600 focus:border-primary'
+                            }`}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 p-1"
+                          >
+                            {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                          </button>
+                        </div>
+                        {editFormData.confirmPassword &&
+                          editFormData.password !== editFormData.confirmPassword && (
+                            <p className="text-[11px] text-emergency mt-1">
+                              Passwords do not match
+                            </p>
+                          )}
                       </div>
-                  }
+                    )}
                   </div>
                 </div>
+                </div>
 
-                <div className="pt-2 sm:pt-4 flex flex-col sm:flex-row gap-3">
+                <div className="p-4 sm:p-5 border-t border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50 shrink-0 flex flex-col sm:flex-row gap-3">
                   <button
                   type="button"
                   onClick={() => setEditProfileModalOpen(false)}
@@ -1151,9 +1279,10 @@ export function PublicAnnouncementsPage() {
                   </button>
                   <button
                   type="submit"
-                  className="w-full sm:flex-1 min-h-[44px] py-3 px-4 bg-primary hover:bg-primary-light text-white text-sm sm:text-base font-semibold rounded-xl transition-colors shadow-sm">
+                  disabled={isSavingProfile}
+                  className="w-full sm:flex-1 min-h-[44px] py-3 px-4 bg-primary hover:bg-primary-light disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm sm:text-base font-semibold rounded-xl transition-colors shadow-sm">
                   
-                    Save Changes
+                    {isSavingProfile ? 'Saving Changes...' : 'Save Changes'}
                   </button>
                 </div>
               </form>

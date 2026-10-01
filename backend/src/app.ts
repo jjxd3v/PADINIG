@@ -14,7 +14,7 @@ function getCorsOrigins(): string[] {
   if (!raw) return ['http://localhost:5173'];
   return raw
     .split(',')
-    .map((s) => s.trim())
+    .map((s) => s.trim().replace(/\/$/, ''))
     .filter(Boolean);
 }
 
@@ -29,7 +29,8 @@ export function createApp() {
     cors({
       origin(origin, cb) {
         if (!origin) return cb(null, true);
-        if (origins.includes(origin)) return cb(null, true);
+        const normalized = origin.replace(/\/$/, '');
+        if (origins.includes('*') || origins.includes(normalized)) return cb(null, true);
         return cb(new Error(`CORS blocked for origin: ${origin}`));
       },
       credentials: true,

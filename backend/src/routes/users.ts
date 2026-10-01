@@ -97,8 +97,14 @@ const createUserSchema = z.object({
 });
 
 const patchSchema = z.object({
+  name: z.string().min(1).optional(),
+  username: z.string().min(3).max(32).regex(/^[a-zA-Z0-9_]+$/).optional(),
+  email: z.string().email().nullable().optional(),
+  contactNumber: z.string().min(1).nullable().optional(),
+  purok: z.string().nullable().optional(),
   isActive: z.boolean().optional(),
   role: z.enum(['ADMIN', 'RESIDENT']).optional(),
+  password: z.string().min(6).optional(),
 });
 
 // POST /users - Admin creates a new resident
@@ -164,22 +170,38 @@ router.post('/', validateBody(createUserSchema), async (req, res, next) => {
 router.patch('/:id', validateBody(patchSchema), async (req, res, next) => {
   try {
     const id = req.params.id;
-    const { isActive, role } = req.body as z.infer<typeof patchSchema>;
+    const { name, username, email, contactNumber, purok, isActive, role, password } = req.body as z.infer<typeof patchSchema>;
+
+    let passwordHash: string | undefined;
+    if (password && password.trim().length > 0) {
+      if (password.length < 6) {
+        return res.status(400).json(fail('Password must be at least 6 characters', { code: 'WEAK_PASSWORD' }));
+      }
+      passwordHash = await bcrypt.hash(password, 10);
+    }
 
     const updated = await prisma.user.update({
       where: { id },
       data: {
-        ...(isActive === undefined ? {} : { isActive }),
-        ...(role ? { role } : {}),
+        ...(name !== undefined ? { name } : {}),
+        ...(username !== undefined ? { username } : {}),
+        ...(email !== undefined ? { email } : {}),
+        ...(contactNumber !== undefined ? { contactNumber } : {}),
+        ...(purok !== undefined ? { purok } : {}),
+        ...(isActive !== undefined ? { isActive } : {}),
+        ...(role !== undefined ? { role } : {}),
+        ...(passwordHash ? { password: passwordHash } : {}),
         updatedAt: new Date(),
       },
       select: {
         id: true,
+        username: true,
         email: true,
         name: true,
         role: true,
         purok: true,
         contactNumber: true,
+        avatarUrl: true,
         isActive: true,
         createdAt: true,
         updatedAt: true,
