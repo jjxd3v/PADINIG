@@ -36,7 +36,7 @@ router.post('/signup', validateBody(signupSchema), async (req, res, next) => {
     const existingUsername = await prisma.user.findUnique({ where: { username } });
     if (existingUsername) return res.status(409).json(fail('Username already in use', { code: 'USERNAME_TAKEN' }));
     if (email) {
-      const existingEmail = await prisma.user.findUnique({ where: { email } });
+      const existingEmail = await prisma.user.findFirst({ where: { email } });
       if (existingEmail) return res.status(409).json(fail('Email already in use', { code: 'EMAIL_TAKEN' }));
     }
 
